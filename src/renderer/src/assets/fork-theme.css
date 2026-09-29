@@ -1,0 +1,1000 @@
+/* Astra Clash theme: layout, palettes and component styling. Imported at the end of main.css.
+   Palettes set --p-* variables on <html data-palette="..."> (see astra/palettes.ts).
+   This file maps them onto the app's own tokens, so upstream components need no changes.
+   Without data-palette (a custom theme is active) upstream colors apply as before. */
+
+@theme {
+  --font-sans: 'Onest Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+:root[data-palette] {
+  --background: var(--p-bg);
+  --foreground: var(--p-fg);
+  --card: color-mix(in srgb, var(--p-surface) 72%, transparent);
+  --card-foreground: var(--p-fg);
+  --popover: var(--p-surface);
+  --popover-foreground: var(--p-fg);
+  --primary: var(--p-accent);
+  --primary-foreground: var(--p-on);
+  --secondary: var(--p-raised);
+  --secondary-foreground: var(--p-fg);
+  --muted: var(--p-raised);
+  --muted-foreground: var(--p-fg3);
+  --accent: color-mix(in srgb, var(--p-accent) 16%, var(--p-surface));
+  --accent-foreground: var(--p-fg);
+  --border: var(--p-line);
+  --input: var(--p-line-strong);
+  --ring: var(--p-accent);
+  --stroke: var(--p-line-strong);
+
+  /* Power button: accent gradient when on, a quiet surface when off. */
+  --stroke-power-on: var(--p-accent);
+  --gradient-start-power-on: var(--p-accent);
+  --gradient-end-power-on: var(--p-accent2);
+  --stroke-power-off: var(--p-line-strong);
+  --gradient-start-power-off: var(--p-raised);
+  --gradient-end-power-off: var(--p-surface);
+
+  --profile-active: color-mix(in srgb, var(--p-accent) 28%, transparent);
+  --stroke-profile-active: var(--p-accent);
+  --profile-inactive: color-mix(in srgb, var(--p-surface) 55%, transparent);
+  --stroke-profile-inactive: var(--p-line-strong);
+
+  --chart-1: var(--p-accent);
+  --chart-2: var(--p-accent2);
+
+  --sidebar: color-mix(in srgb, var(--p-surface) 58%, transparent);
+  --sidebar-foreground: var(--p-fg);
+  --sidebar-primary: var(--p-accent);
+  --sidebar-primary-foreground: var(--p-on);
+  --sidebar-accent: color-mix(in srgb, var(--p-accent) 15%, transparent);
+  --sidebar-accent-foreground: var(--p-text);
+  --sidebar-border: var(--p-line);
+  --sidebar-ring: var(--p-accent);
+}
+
+/* Background: glows drift slowly, 22 to 31 seconds per pass. Transform only, so the GPU
+   composites them without repainting. Stopped when macOS "Reduce motion" is on. */
+.astra-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--p-bg);
+}
+.astra-glow {
+  position: absolute;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(64px);
+  will-change: transform;
+}
+.astra-glow.g1 {
+  background: var(--p-glow1);
+  top: -30%;
+  left: -15%;
+  opacity: 0.75;
+  animation: astra-drift1 22s ease-in-out infinite alternate;
+}
+.astra-glow.g2 {
+  background: var(--p-glow2);
+  bottom: -40%;
+  right: -20%;
+  opacity: 0.85;
+  animation: astra-drift2 28s ease-in-out infinite alternate;
+}
+.astra-glow.g3 {
+  background: var(--p-glow3);
+  width: 55%;
+  top: 20%;
+  left: 35%;
+  opacity: 0.9;
+  animation: astra-drift3 26s ease-in-out infinite alternate;
+}
+.astra-glow.g4 {
+  background: var(--p-glow4);
+  width: 50%;
+  top: -25%;
+  right: -10%;
+  opacity: 0.9;
+  animation: astra-drift4 31s ease-in-out infinite alternate;
+}
+.astra-stars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+@keyframes astra-drift1 {
+  to {
+    transform: translate(35%, 25%) scale(1.1);
+  }
+}
+@keyframes astra-drift2 {
+  to {
+    transform: translate(-30%, -20%) scale(0.9);
+  }
+}
+@keyframes astra-drift3 {
+  to {
+    transform: translate(-25%, 15%) scale(1.15);
+  }
+}
+@keyframes astra-drift4 {
+  to {
+    transform: translate(-20%, 30%) scale(0.85);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .astra-glow {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Astra Clash layout (design/mockup.html). Colors use the app tokens (--background, --foreground,
+   --primary, ...), which the palette sets, so the layout also works with an imported custom theme. */
+
+:root {
+  --astra-accent: var(--p-accent, var(--primary));
+  --astra-accent2: var(--p-accent2, var(--primary));
+  --astra-on: var(--p-on, var(--primary-foreground));
+  --astra-text: var(--p-text, var(--primary));
+  --astra-soft: color-mix(in srgb, var(--astra-accent) 15%, transparent);
+  --astra-glass: color-mix(in srgb, var(--p-surface, var(--card)) 60%, transparent);
+  --astra-glass-strong: color-mix(in srgb, var(--p-surface, var(--card)) 85%, transparent);
+  --astra-line: var(--p-line, var(--border));
+  --astra-line-strong: var(--p-line-strong, var(--input));
+  /* Secondary text. The muted token (--p-fg3) is too dim over the glows. */
+  --astra-fg2: var(--p-fg2, var(--muted-foreground));
+  --astra-ok: #4ade80;
+  --astra-warn: #fbbf24;
+  --astra-bad: #f87171;
+}
+:root:not(.dark) {
+  --astra-ok: #15803d;
+  --astra-warn: #b45309;
+  --astra-bad: #b91c1c;
+}
+
+/* Sidebar */
+.astra-side {
+  position: relative;
+  z-index: 10;
+  flex: none;
+  width: 224px;
+  /* Nothing inside may widen the sidebar or push the layout sideways. */
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 12px 12px;
+  background: var(--astra-glass);
+  border-right: 1px solid var(--astra-line);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+.astra-side-top {
+  height: 46px;
+  flex: none;
+}
+.astra-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 12px 18px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.astra-nav {
+  display: grid;
+  gap: 2px;
+}
+.astra-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 0;
+  background: none;
+  color: var(--muted-foreground);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.astra-nav button:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.astra-nav button[aria-current='page'] {
+  color: var(--astra-text);
+  background: var(--astra-soft);
+}
+.astra-count {
+  margin-left: auto;
+  font: 500 10.5px var(--font-mono);
+  color: var(--muted-foreground);
+}
+.astra-side-foot {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.astra-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--astra-line);
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.astra-mode button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.astra-mode button[aria-pressed='true'] {
+  color: var(--foreground);
+  background: var(--astra-glass-strong);
+  box-shadow: 0 1px 0 var(--astra-line-strong);
+}
+.astra-status {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--astra-line);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+.astra-status-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.astra-status-top .astra-chip {
+  margin-left: auto;
+  height: 19px;
+  flex: none;
+}
+.astra-status-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.astra-status-rate {
+  display: flex;
+  justify-content: space-between;
+  font: 500 11px var(--font-mono);
+  color: var(--astra-fg2);
+}
+.astra-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.astra-dot.on {
+  background: var(--astra-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--astra-ok) 25%, transparent);
+}
+
+/* Shared pieces */
+.astra-card {
+  border-radius: 14px;
+  border: 1px solid var(--astra-line);
+  background: var(--astra-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+.astra-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--astra-line-strong);
+  background: var(--astra-glass);
+  font: 500 11px var(--font-mono);
+  color: var(--astra-fg2);
+  white-space: nowrap;
+}
+.astra-chip.acc {
+  color: var(--astra-text);
+  border-color: color-mix(in srgb, var(--astra-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--astra-accent) 10%, transparent);
+}
+.astra-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--astra-line-strong);
+  background: var(--astra-glass);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.astra-btn.primary {
+  border-color: transparent;
+  background: linear-gradient(140deg, var(--astra-accent), var(--astra-accent2));
+  color: var(--astra-on);
+  font-weight: 600;
+}
+.astra-ib {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.astra-ib:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+.astra-ib.sm {
+  width: 26px;
+  height: 26px;
+}
+.astra-ib:disabled {
+  opacity: 0.5;
+}
+
+/* Page header and content */
+.astra-ph-row {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 22px;
+}
+.astra-ph-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.astra-ph-row.compact {
+  height: 22px;
+}
+.astra-ph-acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.astra-content {
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  /* No bottom padding: Proxies, Connections, Rules and Logs size their lists to fill this area
+     exactly (heights in their pages are adjusted for the 64 px header). */
+  padding: 0 14px;
+}
+
+.astra-content.compact {
+  height: calc(100vh - 22px);
+}
+
+/* Empty state */
+.astra-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  text-align: center;
+}
+.astra-empty-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--astra-soft);
+  color: var(--astra-text);
+}
+.astra-empty h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.astra-empty p {
+  margin: 0 0 6px;
+  max-width: 36ch;
+  color: var(--muted-foreground);
+}
+
+/* Home */
+.astra-home {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  /* Same margin on every side: 22 px strip on top, 8 + 14 px at the sides, 22 px at the bottom. */
+  padding: 0 8px 22px;
+}
+.astra-home-top {
+  display: grid;
+  gap: 10px;
+}
+.astra-prof {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 18px;
+}
+.astra-prof-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.astra-logo {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  object-fit: cover;
+  font-weight: 700;
+  background: linear-gradient(140deg, var(--astra-accent), var(--astra-accent2));
+  color: var(--astra-on);
+}
+.astra-prof-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.astra-prof-note {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: pre-line;
+}
+.astra-stat {
+  display: grid;
+  gap: 2px;
+  min-width: 92px;
+  padding-left: 18px;
+  border-left: 1px solid var(--astra-line);
+}
+.astra-stat span {
+  font-size: 11.5px;
+  color: var(--astra-fg2);
+}
+.astra-stat b {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+.astra-expiry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+}
+.astra-expiry-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+.astra-expiry-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--destructive);
+}
+.astra-expiry-hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.astra-home-center {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  min-height: 0;
+}
+.astra-power {
+  position: relative;
+  isolation: isolate;
+  width: 148px;
+  height: 148px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted-foreground);
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--secondary) 80%, var(--foreground) 8%),
+    var(--secondary) 70%
+  );
+  box-shadow:
+    0 0 0 1px var(--astra-line-strong),
+    0 0 0 8px color-mix(in srgb, var(--secondary) 55%, transparent);
+  /* Only transform and color animate. The glow is a separate layer that fades (see ::before), so
+     switching does not repaint a 70 px shadow on every frame while the jump starts. */
+  transition:
+    transform 0.25s,
+    color 0.3s;
+  cursor: pointer;
+}
+.astra-power::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 8px var(--astra-soft),
+    0 0 70px var(--p-glow1, var(--astra-soft));
+  opacity: 0;
+  transition: opacity 0.4s;
+  will-change: opacity;
+}
+.astra-power.on::before {
+  opacity: 1;
+}
+.astra-power:hover:not(:disabled) {
+  transform: scale(1.03);
+}
+.astra-power:disabled {
+  cursor: default;
+}
+.astra-power.on {
+  color: var(--astra-on);
+  background:
+    radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--astra-accent) 70%, white), transparent 45%),
+    linear-gradient(140deg, var(--astra-accent), var(--astra-accent2));
+  box-shadow: none;
+}
+.astra-power.busy {
+  transform: scale(0.95);
+}
+.astra-state {
+  height: 22px;
+  line-height: 22px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.astra-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.astra-timer {
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 13px var(--font-mono);
+  color: var(--astra-fg2);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
+}
+.astra-timer.show {
+  opacity: 1;
+  transform: none;
+}
+.astra-timer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 500;
+}
+.astra-home-foot {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+.astra-node {
+  width: min(460px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.astra-node:hover {
+  border-color: var(--astra-line-strong);
+}
+.astra-node-lab {
+  font-size: 11px;
+  color: var(--astra-fg2);
+}
+.astra-node-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.astra-delay {
+  font: 600 11.5px var(--font-mono);
+}
+.astra-delay.ok {
+  color: var(--astra-ok);
+}
+.astra-delay.warn {
+  color: var(--astra-warn);
+}
+.astra-delay.bad {
+  color: var(--astra-bad);
+}
+.astra-prof-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--astra-fg2);
+  opacity: 0.8;
+}
+.astra-prof-meta > * + *::before {
+  content: '·';
+  margin: 0 6px;
+}
+.astra-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.astra-support:hover {
+  color: var(--foreground);
+}
+
+/* Settings */
+.astra-settings {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 18px;
+  align-items: start;
+  padding: 0 8px;
+}
+.astra-subnav {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 2px;
+}
+.astra-subnav button {
+  padding: 7px 10px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.astra-subnav button[aria-current='true'] {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.astra-sec {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.astra-settings .astra-sec {
+  margin-inline: 0;
+}
+.astra-content > .astra-sec {
+  margin-inline: 8px;
+}
+.astra-sec-title {
+  margin: 0 0 8px 4px;
+  font: 600 11px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.astra-sec .astra-sec-title {
+  margin-bottom: 0;
+}
+[id^='set-'] {
+  scroll-margin-top: 4px;
+}
+.astra-rows {
+  padding: 2px 0;
+}
+.astra-row {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--astra-line);
+}
+.astra-rows > .astra-row:last-child,
+.astra-rows > :last-child > .astra-row:last-child {
+  border-bottom: 0;
+}
+.astra-row-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.astra-row-label h4,
+.astra-row-block h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.astra-row-acts {
+  display: flex;
+  align-items: center;
+}
+.astra-row-block {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--astra-line);
+}
+
+/* Tabs (segmented controls) in the palette look: selected segment is a raised glass pill. */
+:root[data-palette] [data-slot='tabs-list'][data-variant='default'] {
+  border-color: var(--astra-line);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+:root[data-palette] [data-slot='tabs-list'][data-variant='default'] [data-slot='tabs-trigger'][data-state='active'] {
+  background: var(--astra-glass-strong);
+  border-color: var(--astra-line-strong);
+  color: var(--foreground);
+  opacity: 1;
+}
+
+/* Switch track when off: visible on light backgrounds too. */
+:root[data-palette] [data-slot='switch'][data-state='unchecked'] {
+  background: color-mix(in srgb, var(--foreground) 16%, transparent);
+  border-color: var(--astra-line-strong);
+}
+
+.astra-row-note {
+  padding: 10px 14px 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+/* Upstream's .flag-emoji puts node names in the system font so flags come from its Twemoji font
+   (Windows has no flag emoji). On macOS use Onest for the text and Apple Color Emoji for emoji and
+   flags; Twemoji stays only as a last fallback. */
+:root[data-palette] .flag-emoji {
+  font-family: 'Onest Variable', 'Apple Color Emoji', 'twemoji', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Fixed-width readouts from astra/format.ts: keep the padding spaces. */
+.astra-fixed,
+.astra-fixed span {
+  white-space: pre;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Palette picker: compact tiles, one row per group. */
+.astra-palette-row {
+  display: grid;
+  gap: 8px;
+}
+.astra-palette-tile {
+  display: grid;
+  gap: 5px;
+  padding: 5px 5px 7px;
+  border-radius: 11px;
+  border: 1px solid var(--astra-line);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  text-align: left;
+  cursor: pointer;
+}
+.astra-palette-tile:hover {
+  border-color: var(--astra-line-strong);
+}
+.astra-palette-tile[aria-pressed='true'] {
+  border-color: var(--astra-accent);
+  box-shadow: 0 0 0 1px var(--astra-soft);
+}
+.astra-palette-swatch {
+  position: relative;
+  display: block;
+  height: 34px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.astra-palette-swatch i {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+}
+.astra-palette-more .astra-palette-swatch {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--astra-line-strong);
+  font: 600 14px var(--font-mono);
+  color: var(--muted-foreground);
+}
+.astra-palette-more .astra-palette-name {
+  color: var(--muted-foreground);
+}
+.astra-palette-name {
+  padding: 0 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Shortcut recorder: compact, fixed width, same size as the row labels. */
+.astra-shortcut {
+  width: 176px;
+  font-size: 12px;
+}
+
+/* Node picker on Home (astra/node-picker.tsx). */
+.astra-picker {
+  width: 360px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--astra-line-strong);
+  background: var(--astra-glass-strong);
+  -webkit-backdrop-filter: blur(30px);
+  backdrop-filter: blur(30px);
+}
+.astra-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 6px 10px;
+  font: 600 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--astra-fg2);
+}
+.astra-picker-list {
+  display: grid;
+  gap: 1px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.astra-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.astra-picker-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+.astra-picker-item[aria-current='true'] {
+  background: var(--astra-soft);
+  color: var(--astra-text);
+}
+.astra-picker-item:disabled {
+  cursor: default;
+}
+.astra-picker-note {
+  padding: 6px 10px 0;
+  font-size: 11.5px;
+  color: var(--astra-fg2);
+}
+.astra-picker-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--astra-line);
+  font-size: 12px;
+  color: var(--astra-fg2);
+  cursor: pointer;
+}
+.astra-picker-foot:hover {
+  color: var(--foreground);
+}
+
+/* Values and buttons inside settings rows: sized to the 13 px row labels. */
+.astra-value {
+  font: 500 12px var(--font-mono);
+  color: var(--astra-fg2);
+}
+:root[data-palette] .astra-rows [data-slot='button'][data-size='sm'] {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+:root[data-palette] .astra-rows [data-slot='button'][data-variant='default'] {
+  border: 1px solid var(--astra-line-strong);
+  background: var(--astra-glass);
+  color: var(--foreground);
+  box-shadow: none;
+}
+:root[data-palette] .astra-rows [data-slot='button'][data-variant='default']:hover {
+  border-color: var(--astra-accent);
+  background: var(--astra-glass-strong);
+}
+
+/* Windows: native caption buttons sit over the top right corner (main/index.ts, titleBarOverlay).
+   env(titlebar-area-*) describe the part of the title bar left free of them; without the overlay
+   they are unset and the fallbacks change nothing. */
+html[data-platform='win32'] {
+  --astra-caption-w: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  --astra-caption-h: env(titlebar-area-height, 0px);
+}
+html[data-platform='win32'] .astra-ph-row {
+  padding-right: calc(22px + var(--astra-caption-w));
+}
+html[data-platform='win32'] .astra-ph-row.compact {
+  height: max(22px, var(--astra-caption-h));
+}
+html[data-platform='win32'] .astra-content.compact {
+  height: calc(100vh - max(22px, var(--astra-caption-h)));
+}
+/* No traffic lights on the left, so the name sits level with the page titles. */
+html[data-platform='win32'] .astra-side-top {
+  height: 16px;
+}
+
+/* Settings, About: credits line under the last card. */
+.astra-credits {
+  margin: 10px 4px 24px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
