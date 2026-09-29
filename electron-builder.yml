@@ -1,0 +1,93 @@
+appId: app.astraclash
+afterSign: build/astra-sign.cjs
+productName: Astra Clash
+# Astra Clash: shown in Windows file properties. The publisher (CompanyName) comes from "author" in
+# package.json, set to "Astra Clash" so upstream authors are not named as publishers of this build.
+copyright: Copyright © 2026 Astra Clash. Based on Koala Clash by coolcoala, which builds on Sparkle by xishang0128 and Mihomo Party by pompurin404. GPL-3.0.
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!aur/*'
+  - '!images/*'
+  - '!scripts/*'
+  - '!extra/*'
+  - '!tailwind.config.js'
+  - '!postcss.config.js'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+extraResources:
+  - from: './extra/'
+    to: ''
+protocols:
+  name: 'Astra Clash URI Scheme'
+  schemes:
+    - 'clash'
+    - 'mihomo'
+    - 'astra-clash'
+win:
+  # Astra Clash: installer only. Unsigned, so SmartScreen warns on the first run ("More info", then
+  # "Run anyway"). The portable 7z is dropped: the app starts itself as administrator through a
+  # scheduled task that points at the installed path.
+  target:
+    - nsis
+nsis:
+  artifactName: Astra-Clash_${version}_${arch}-setup.${ext}
+  uninstallDisplayName: ${productName}
+  allowToChangeInstallationDirectory: true
+  oneClick: false
+  perMachine: true
+  createDesktopShortcut: true
+  include: build/nsis/installer.nsh
+mac:
+  target:
+    - pkg
+  # Ad-hoc signature ("-") only; builds are not signed with an Apple Developer ID.
+  identity: '-'
+  # No hardened runtime: it turns on library validation, and ad-hoc signed Electron cannot load its own
+  # framework under it ("different Team IDs"). The hardened runtime only matters for notarized apps.
+  hardenedRuntime: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+  extendInfo:
+    - NSCameraUsageDescription: Application requests access to the device's camera.
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
+    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+  artifactName: Astra-Clash_${version}_${arch}.${ext}
+pkg:
+  allowAnywhere: false
+  allowCurrentUserHome: false
+  # Astra Clash: always replace the installed app. With the version check on, macOS silently skipped
+  # the app when its version was lower than the installed one (1.0.0 after upstream's 1.4.1).
+  isVersionChecked: false
+  # Always install to /Applications, never to another copy with the same bundle id (e.g. in dist/).
+  isRelocatable: false
+  # background:
+  #   alignment: bottomleft
+  #   file: build/background.png
+linux:
+  desktop:
+    entry:
+      Name: Astra Clash
+      MimeType: 'x-scheme-handler/clash;x-scheme-handler/mihomo;x-scheme-handler/astra-clash'
+  target:
+    - deb
+    - rpm
+    - pacman
+  maintainer: coolcoala
+  category: Utility
+  artifactName: ${productName}_${arch}.${ext}
+deb:
+  afterInstall: 'build/linux/postinst'
+rpm:
+  afterInstall: 'build/linux/postinst'
+pacman:
+  afterInstall: 'build/linux/postinst'
+  artifactName: ${productName}_${arch}.pkg.tar.xz
+npmRebuild: true
+publish: []

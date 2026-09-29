@@ -1,0 +1,17 @@
+#!/bin/sh
+
+APP_NAME="Astra Clash"
+
+# --- Remove old app only if it is the old fork (contains koala-mihomo) ---
+OLD_APP="/Applications/${APP_NAME}.app"
+if [ -f "$OLD_APP/Contents/MacOS/koala-mihomo" ]; then
+    pkill -f "$OLD_APP" 2>/dev/null || true
+    sleep 2
+    pkill -9 -f "$OLD_APP" 2>/dev/null || true
+    rm -rf "$OLD_APP"
+fi
+
+# Astra Clash: upstream also removes a system-wide sparkle.helper service here. That belongs to
+# other apps (Sparkle, older Mihomo Party), so the fork leaves it alone.
+
+exit 0
