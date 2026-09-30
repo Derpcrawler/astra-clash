@@ -1,21 +1,24 @@
 // Astra Clash: download a newer mihomo core without updating the app.
 //
-// The download is checked against the SHA-256 digest GitHub publishes for the release asset, then
-// copied into a root-owned folder and given the setuid bit in one administrator prompt, the same
-// rights the built-in core gets from the installer. While `downloadedCore` is set in the app
+// The download is checked against the SHA-256 digest GitHub publishes for the release asset. The
+// administrator step (astra/core-install.ts) then copies it into a root-owned folder, checks the
+// digest of that copy again and gives it the setuid bit, the same rights the built-in core gets from
+// the installer. While `downloadedCore` is set in the app
 // config, mihomoCorePath('mihomo') points at it (utils/dirs.ts), so the rest of the app is unchanged.
 
-import axios, { AxiosRequestConfig } from 'axios'
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { createHash } from 'crypto'
 import { execFile } from 'child_process'
 import { existsSync } from 'fs'
-import { chmod, mkdir, readdir, rm, writeFile } from 'fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from 'fs/promises'
 import path from 'path'
 import { promisify } from 'util'
 import { gunzipSync } from 'zlib'
-import { getAppConfig, getControledMihomoConfig, patchAppConfig } from '../config'
+import { getAppConfig, patchAppConfig } from '../config'
 import { ASTRA_CORE_DIR as CORE_DIR, dataDir, mihomoCoreDir } from '../utils/dirs'
-import { restartCore } from '../core/manager'
+import { hasCoreProcess, restartCore } from '../core/manager'
+import { getRuntimeConfig } from '../core/factory'
+import { describeInstallFailure, installScript, osascriptArgs } from './core-install'
 
 const execFileP = promisify(execFile)
 const RELEASE_API = 'https://api.github.com/repos/MetaCubeX/mihomo/releases/latest'
@@ -43,17 +46,36 @@ function assetName(tag: string): string {
   return `mihomo-darwin-${arch}-${tag}.gz`
 }
 
-// Requests go through the local mixed port when it is open, since GitHub may be blocked directly.
+// Requests go through the local mixed port when the core is listening on it, since GitHub may be
+// blocked directly. The port comes from the config the core runs with: while disconnected the app
+// starts the core with its proxy ports set to 0, whatever the saved mixed-port says.
 async function requestConfig(): Promise<AxiosRequestConfig> {
-  const { 'mixed-port': port = 0 } = await getControledMihomoConfig()
-  return port
+  const runtime = hasCoreProcess() ? await getRuntimeConfig().catch(() => undefined) : undefined
+  const port = Number(runtime?.['mixed-port'] ?? 0)
+  return port > 0
     ? { proxy: { protocol: 'http', host: '127.0.0.1', port }, timeout: 30_000 }
     : { timeout: 30_000 }
 }
 
-export async function latestCore(): Promise<CoreRelease> {
+// A GET through the local proxy when there is one. If the local listener refuses the connection
+// (for example while the core restarts), the request is repeated once without the proxy; any
+// other error is reported as it is.
+export async function fetchGitHub<T = unknown>(url: string, extra: AxiosRequestConfig = {}): Promise<AxiosResponse<T>> {
   const cfg = await requestConfig()
-  const res = await axios.get(RELEASE_API, { ...cfg, headers: { Accept: 'application/vnd.github+json' } })
+  try {
+    return await axios.get<T>(url, { ...cfg, ...extra })
+  } catch (e) {
+    if (cfg.proxy && (e as { code?: string }).code === 'ECONNREFUSED') {
+      return await axios.get<T>(url, { timeout: 30_000, ...extra })
+    }
+    throw e
+  }
+}
+
+export async function latestCore(): Promise<CoreRelease> {
+  const res = await fetchGitHub<{ tag_name: string; assets: unknown }>(RELEASE_API, {
+    headers: { Accept: 'application/vnd.github+json' }
+  })
   const tag: string = res.data.tag_name
   if (!TAG_RE.test(tag)) throw new Error(`Unexpected release tag: ${tag}`)
   const name = assetName(tag)
@@ -85,37 +107,69 @@ export async function coreState(): Promise<CoreState> {
 }
 
 async function asAdmin(shell: string): Promise<void> {
-  const script = `do shell script "${shell.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" with administrator privileges`
-  await execFileP('osascript', ['-e', script])
+  await execFileP('osascript', osascriptArgs(shell, true))
 }
 
+// osascript reports the shell's exit status at the end of its message, for example "(4)".
+function exitCodeOf(error: unknown): number | undefined {
+  const m = String((error as { stderr?: string })?.stderr ?? error).match(/\((-?\d+)\)\s*$/)
+  return m ? Number(m[1]) : undefined
+}
+
+// One download at a time: a second click while the first waits for the password is refused.
+let downloading = false
+
 export async function downloadCore(): Promise<string> {
+  if (downloading) throw new Error('A core download is already running')
+  downloading = true
+  try {
+    return await downloadAndInstall()
+  } finally {
+    downloading = false
+  }
+}
+
+async function downloadAndInstall(): Promise<string> {
   const release = await latestCore()
-  const cfg = await requestConfig()
-  const res = await axios.get(release.url, { ...cfg, responseType: 'arraybuffer', timeout: 120_000 })
+  const res = await fetchGitHub<ArrayBuffer>(release.url, { responseType: 'arraybuffer', timeout: 120_000 })
   const gz = Buffer.from(res.data)
   const actual = createHash('sha256').update(gz).digest('hex')
   if (actual !== release.sha256) {
     throw new Error(`SHA-256 mismatch for ${release.asset}: got ${actual}, GitHub lists ${release.sha256}`)
   }
+  // The installer checks the file it installs against this digest of the verified bytes.
+  const core = gunzipSync(gz)
+  const coreSha256 = createHash('sha256').update(core).digest('hex')
 
-  const tmpDir = path.join(dataDir(), 'tmp')
-  await mkdir(tmpDir, { recursive: true })
-  const tmp = path.join(tmpDir, `mihomo-${release.version}`)
-  await writeFile(tmp, gunzipSync(gz))
-  await chmod(tmp, 0o755)
+  // Own folder per attempt, readable only by the user.
+  const tmpRoot = path.join(dataDir(), 'tmp')
+  await mkdir(tmpRoot, { recursive: true })
+  const tmpDir = await mkdtemp(path.join(tmpRoot, 'core-'))
+  await chmod(tmpDir, 0o700)
+  const tmp = path.join(tmpDir, 'mihomo')
+  await writeFile(tmp, core, { mode: 0o700 })
   try {
     // Refuse a binary that does not run or does not report the expected version.
     const { stdout } = await execFileP(tmp, ['-v'], { timeout: 10_000 })
     if (!stdout.includes(release.version)) throw new Error(`Downloaded core reports: ${stdout.trim()}`)
 
-    const target = path.join(CORE_DIR, `mihomo-${release.version}`)
-    await asAdmin(
-      `mkdir -p '${CORE_DIR}' && chown root:wheel '${CORE_DIR}' && chmod 755 '${CORE_DIR}' && ` +
-        `cp '${tmp}' '${target}' && chown root:admin '${target}' && chmod 4755 '${target}'`
-    )
+    try {
+      await asAdmin(
+        installScript({
+          source: tmp,
+          sha256: coreSha256,
+          coreDir: CORE_DIR,
+          name: `mihomo-${release.version}`,
+          dirOwner: 'root:wheel',
+          fileOwner: 'root:admin',
+          mode: '4755'
+        })
+      )
+    } catch (e) {
+      throw new Error(describeInstallFailure(exitCodeOf(e)) ?? `Installing the core failed: ${e}`)
+    }
   } finally {
-    await rm(tmp, { force: true })
+    await rm(tmpDir, { recursive: true, force: true })
   }
 
   await patchAppConfig({ downloadedCore: release.version, core: 'mihomo' })

@@ -90,7 +90,6 @@ const Backdrop: React.FC<Props> = ({ stars = true, jump = true }) => {
       workerRef.current = null
     }
     // The canvas can be handed to a worker only once, so this runs once per mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

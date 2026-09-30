@@ -6,19 +6,17 @@ productName: Astra Clash
 copyright: Copyright © 2026 Astra Clash. Based on Koala Clash by coolcoala, which builds on Sparkle by xishang0128 and Mihomo Party by pompurin404. GPL-3.0.
 directories:
   buildResources: build
+# Astra Clash: package only what the app loads, listed explicitly. The repo also holds notes, design
+# files and tooling that must never ship; an exclusion list let them into the 1.0.0 packages.
+# Production node_modules are added by electron-builder.
+# build/astra-check-package.cjs (afterPack) fails the build if anything else ends up in app.asar.
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!aur/*'
-  - '!images/*'
-  - '!scripts/*'
-  - '!extra/*'
-  - '!tailwind.config.js'
-  - '!postcss.config.js'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - out/**
+  - resources/**
+  - package.json
+  - LICENSE
+  - '!**/.vscode/**'
+afterPack: build/astra-check-package.cjs
 extraResources:
   - from: './extra/'
     to: ''
