@@ -163,7 +163,7 @@ const ConnectionItemComponent: React.FC<Props> = ({
                 <>
                   <span className="text-xs text-muted-foreground/40">|</span>
                   <span
-                    className={`text-xs tabular-nums ${info.isActive ? 'text-gradient-end-power-on' : 'text-muted-foreground'}`}
+                    className={`text-xs tabular-nums ${info.isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
                     ↑ {uploadSpeed || '0 B'}/s ↓ {downloadSpeed || '0 B'}/s
                   </span>

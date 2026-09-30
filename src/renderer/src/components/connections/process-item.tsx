@@ -83,8 +83,10 @@ const ProcessItemComponent: React.FC<Props> = ({ process, displayIcon, displayAp
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">{name}</span>
               <div className="flex items-center gap-1 shrink-0">
+                {/* Astra Clash: the palette accent, same as the Processes count (upstream used the
+                    power-on gradient end, the palette's second accent here). */}
                 {hasActive && (
-                  <Badge className="min-w-5 h-5 justify-center px-1.5 leading-none text-[11px] bg-gradient-end-power-on text-white border-0">
+                  <Badge className="min-w-5 h-5 justify-center px-1.5 leading-none text-[11px] bg-primary text-primary-foreground border-0">
                     {process.activeCount}
                   </Badge>
                 )}
@@ -106,7 +108,7 @@ const ProcessItemComponent: React.FC<Props> = ({ process, displayIcon, displayAp
                 <>
                   <span className="text-xs text-muted-foreground/40">|</span>
                   <span
-                    className={`text-xs ${hasActive ? 'text-gradient-end-power-on' : 'text-muted-foreground'}`}
+                    className={`text-xs ${hasActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
                     {'\u2191'} {uploadSpeed || '0 B'}/s {'\u2193'} {downloadSpeed || '0 B'}/s
                   </span>

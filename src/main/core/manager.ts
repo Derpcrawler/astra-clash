@@ -1,3 +1,5 @@
+import { DEFAULT_STOP_TIMINGS, isChildRunning, stopChildProcess } from './child-process'
+import { watchStartup } from './startup-watch'
 import { ChildProcess, execFile, execFileSync, spawn } from 'child_process'
 import {
   dataDir,
@@ -72,7 +74,6 @@ let networkDownHandled = false
 let child: ChildProcess
 let retry = 10
 
-let initialized = false
 let providerNames = new Set<string>()
 let unmatchedProviders = new Set<string>()
 
@@ -88,7 +89,6 @@ export async function resetProviderTracking(): Promise<void> {
     [...Object.keys(ruleProviders || {}), ...Object.keys(proxyProviders || {})].map(normalize)
   )
   unmatchedProviders = new Set(providerNames)
-  initialized = false
 }
 
 export async function startCore(detached = false): Promise<Promise<void>[]> {
@@ -177,97 +177,60 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   })
   child.stdout?.pipe(stdout)
   child.stderr?.pipe(stderr)
-  return new Promise((resolve, reject) => {
-    child.stdout?.on('data', async (data) => {
-      const str = data.toString()
-      if (
-        (process.platform !== 'win32' && str.includes('External controller unix listen error')) ||
-        (process.platform === 'win32' && str.includes('External controller pipe listen error'))
-      ) {
-        reject(`${t('tray.controllerListenError')}:\n${str}`)
-      }
-
-      if (process.platform === 'win32' && str.includes('updater: finished')) {
+  // Astra Clash: startup log read line by line from the first byte (core/startup-watch.ts).
+  const { controller, ready } = watchStartup(child, {
+    platform: process.platform,
+    providerNames,
+    unmatchedProviders,
+    normalize,
+    readyTimeoutMs: 30_000,
+    waitForApi: async () => {
+      for (let i = 0; i < 30; i++) {
         try {
-          await stopCore(true)
-          const promises = await startCore()
-          await Promise.all(promises)
-        } catch (e) {
-          showError(t('tray.coreStartError'), `${e}`)
+          await mihomoGroups()
+          return
+        } catch {
+          await new Promise((r) => setTimeout(r, 100))
         }
       }
-
-      if (
-        (process.platform !== 'win32' && str.includes('RESTful API unix listening at')) ||
-        (process.platform === 'win32' && str.includes('RESTful API pipe listening at'))
-      ) {
-        resolve([
-          new Promise((resolve, reject) => {
-            const handleProviderInitialization = async (logLine: string): Promise<void> => {
-              for (const match of logLine.matchAll(/Start initial provider ([^"]+)"/g)) {
-                const name = normalize(match[1])
-                if (providerNames.has(name)) {
-                  unmatchedProviders.delete(name)
-                }
-              }
-
-              if (
-                logLine.includes(
-                  'Start TUN listening error: configure tun interface: Connect: operation not permitted'
-                )
-              ) {
-                patchControledMihomoConfig({ tun: { enable: false } })
-                mainWindow?.webContents.send('controledMihomoConfigUpdated')
-                ipcMain.emit('updateTrayMenu')
-                reject(t('tray.tunStartFailed'))
-              }
-
-              const isDefaultProvider = logLine.includes(
-                'Start initial compatible provider default'
-              )
-              const isAllProvidersMatched = providerNames.size > 0 && unmatchedProviders.size === 0
-
-              if ((providerNames.size === 0 && isDefaultProvider) || isAllProvidersMatched) {
-                const waitForMihomoReady = async (): Promise<void> => {
-                  const maxRetries = 30
-                  const retryInterval = 100
-
-                  for (let i = 0; i < maxRetries; i++) {
-                    try {
-                      await mihomoGroups()
-                      break
-                    } catch (error) {
-                      await new Promise((r) => setTimeout(r, retryInterval))
-                    }
-                  }
-                }
-
-                await waitForMihomoReady()
-                initialized = true
-                Promise.all([
-                  new Promise((r) => setTimeout(r, 100)).then(() => {
-                    mainWindow?.webContents.send('groupsUpdated')
-                    mainWindow?.webContents.send('rulesUpdated')
-                  }),
-                  new Promise((r) => setTimeout(r, 100)).then(() => applyLogLevel(logLevel))
-                ]).then(() => resolve())
-              }
-            }
-            child.stdout?.on('data', (data) => {
-              if (!initialized) {
-                handleProviderInitialization(data.toString())
-              }
-            })
-          })
-        ])
-        await startMihomoTraffic()
-        await startMihomoConnections()
-        startMihomoLogs(logLevel)
-        await startMihomoMemory()
-        retry = 10
+      throw new Error(t('tray.coreStartError'))
+    },
+    onTunPermissionError: () => {
+      patchControledMihomoConfig({ tun: { enable: false } })
+      mainWindow?.webContents.send('controledMihomoConfigUpdated')
+      ipcMain.emit('updateTrayMenu')
+      return t('tray.tunStartFailed')
+    },
+    onUpdaterFinished: async () => {
+      try {
+        await stopCore(true)
+        const promises = await startCore()
+        await Promise.all(promises)
+      } catch (e) {
+        showError(t('tray.coreStartError'), `${e}`)
       }
-    })
+    }
   })
+  try {
+    await controller
+  } catch (e) {
+    throw e instanceof Error ? e : `${t('tray.controllerListenError')}:\n${e}`
+  }
+  void (async (): Promise<void> => {
+    await startMihomoTraffic()
+    await startMihomoConnections()
+    startMihomoLogs(logLevel)
+    await startMihomoMemory()
+    retry = 10
+  })()
+  return [
+    ready.then(async () => {
+      await new Promise((r) => setTimeout(r, 100))
+      mainWindow?.webContents.send('groupsUpdated')
+      mainWindow?.webContents.send('rulesUpdated')
+      await applyLogLevel(logLevel)
+    })
+  ]
 }
 
 export async function stopCore(force = false): Promise<void> {
@@ -286,10 +249,14 @@ export async function stopCore(force = false): Promise<void> {
   stopMihomoLogs()
   stopMihomoMemory()
 
-  if (child && !child.killed) {
-    await stopChildProcess(child)
-    child = undefined as unknown as ChildProcess
+  // Astra Clash: whether the core still runs comes from its exit status (core/child-process.ts),
+  // not ChildProcess.killed, which turns true as soon as SIGINT is sent.
+  if (isChildRunning(child)) {
+    await stopChildProcess(child, DEFAULT_STOP_TIMINGS, (line) => {
+      writeFile(logPath(), line, { flag: 'a' }).catch(() => {})
+    })
   }
+  child = undefined as unknown as ChildProcess
 
   await getAxios(true).catch(() => {})
 
@@ -315,79 +282,8 @@ export async function stopCore(force = false): Promise<void> {
   }
 }
 
-async function stopChildProcess(process: ChildProcess): Promise<void> {
-  return new Promise<void>((resolve) => {
-    if (!process || process.killed) {
-      resolve()
-      return
-    }
-
-    const pid = process.pid
-    if (!pid) {
-      resolve()
-      return
-    }
-
-    process.removeAllListeners()
-
-    let isResolved = false
-    const timers: NodeJS.Timeout[] = []
-
-    const resolveOnce = async (): Promise<void> => {
-      if (!isResolved) {
-        isResolved = true
-
-        timers.forEach((timer) => clearTimeout(timer))
-        resolve()
-      }
-    }
-
-    process.once('close', resolveOnce)
-    process.once('exit', resolveOnce)
-
-    try {
-      process.kill('SIGINT')
-
-      const timer1 = setTimeout(async () => {
-        if (!process.killed && !isResolved) {
-          try {
-            if (pid) {
-              globalThis.process.kill(pid, 0)
-              process.kill('SIGTERM')
-            }
-          } catch {
-            await resolveOnce()
-          }
-        }
-      }, 3000)
-      timers.push(timer1)
-
-      const timer2 = setTimeout(async () => {
-        if (!process.killed && !isResolved) {
-          try {
-            if (pid) {
-              globalThis.process.kill(pid, 0)
-              process.kill('SIGKILL')
-              await writeFile(logPath(), `[Manager]: Force killed process ${pid} with SIGKILL\n`, {
-                flag: 'a'
-              })
-            }
-          } catch {
-            // ignore
-          }
-          await resolveOnce()
-        }
-      }, 6000)
-      timers.push(timer2)
-    } catch (error) {
-      resolveOnce()
-      return
-    }
-  })
-}
-
 export function hasCoreProcess(): boolean {
-  return !!child && !child.killed && child.exitCode === null
+  return isChildRunning(child)
 }
 
 export async function restartCore(): Promise<void> {
@@ -643,7 +539,7 @@ export async function startNetworkDetection(): Promise<void> {
 
   networkDetectionTimer = setInterval(async () => {
     if (isAnyNetworkInterfaceUp(extendedBypass) && net.isOnline()) {
-      if ((networkDownHandled && !child) || (child && child.killed)) {
+      if ((networkDownHandled && !child) || (child && !isChildRunning(child))) {
         const promises = await startCore()
         await Promise.all(promises)
         if (writeSysProxy) triggerSysProxy(true, onlyActiveDevice)

@@ -26,6 +26,19 @@ export function triggerSysProxy(enable: boolean, onlyActiveDevice: boolean): Pro
   return task
 }
 
+// Astra Clash: for callers that decide to enable the system proxy after waiting on something (wake
+// recovery). A number that changes with every triggerSysProxy call, and an enable that happens only
+// if no call was made since that number was read. The check and the enable run in one synchronous
+// step, so a disconnect cannot slip in between.
+export function sysProxyChangeCount(): number {
+  return triggerSysProxyRequest
+}
+
+export function enableSysProxyUnlessChanged(since: number, onlyActiveDevice: boolean): Promise<boolean> {
+  if (triggerSysProxyRequest !== since) return Promise.resolve(false)
+  return triggerSysProxy(true, onlyActiveDevice).then(() => true)
+}
+
 async function applySysProxy(
   enable: boolean,
   onlyActiveDevice: boolean,

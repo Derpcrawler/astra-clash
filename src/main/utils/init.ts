@@ -20,7 +20,7 @@ import {
   defaultProfileConfig
 } from './template'
 import { stringifyYaml } from './yaml'
-import { mkdir, writeFile, cp, rm, readdir } from 'fs/promises'
+import { chmod, mkdir, writeFile, cp, rm, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import {
@@ -44,6 +44,8 @@ async function initDirs(): Promise<void> {
   if (!existsSync(dataDir())) {
     await mkdir(dataDir())
   }
+  // Astra Clash: profiles and the config hold subscription links and the service's signing key.
+  if (process.platform !== 'win32') await chmod(dataDir(), 0o700).catch(() => {})
   const dirs = [
     themesDir(),
     profilesDir(),
@@ -65,7 +67,7 @@ async function initConfig(): Promise<void> {
   const configTasks: Promise<void>[] = []
 
   if (!existsSync(appConfigPath())) {
-    configTasks.push(writeFile(appConfigPath(), stringifyYaml(defaultConfig)))
+    configTasks.push(writeFile(appConfigPath(), stringifyYaml(defaultConfig), { mode: 0o600 }))
   }
   if (!existsSync(profileConfigPath())) {
     configTasks.push(writeFile(profileConfigPath(), stringifyYaml(defaultProfileConfig)))
@@ -133,15 +135,15 @@ async function cleanup(): Promise<void> {
   }
 }
 
-async function migration(): Promise<void> {
+export async function migration(): Promise<void> {
   const appConfig = await getAppConfig()
   const mihomoConfig = await getControledMihomoConfig()
 
   const mihomoConfigPatch: Partial<MihomoConfig> = {}
 
-  if (appConfig.controlTun === false && mihomoConfig.tun?.enable) {
-    mihomoConfigPatch.tun = { enable: false }
-  }
+  // Astra Clash: upstream turned TUN off here on every launch when controlTun was false. The app
+  // still controls tun.enable in that case (core/factory.ts, config/controledMihomo.ts), so the
+  // reset only threw away the user's TUN connection at each start.
 
   for (const key in defaultControledMihomoConfig) {
     if (
