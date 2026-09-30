@@ -1,6 +1,12 @@
 // Astra Clash: reading the core's startup log. The core reports on stdout when its controller is
-// listening and when each provider starts. Output arrives in chunks that can hold several lines or
-// part of one, so lines are split here and every line goes through one reader in order.
+// listening. Output arrives in chunks that can hold several lines or part of one, so lines are
+// split here and every line goes through one reader in order, from the first byte. Lines after
+// the controller line go to onLine (provider tracking, core/provider-tracker.ts), for as long as
+// the core runs, so hot reloads are seen too.
+//
+// The controller phase is bounded from the moment the watcher is attached: without the controller
+// line within startupTimeoutMs the API is asked instead, so a silent or hanging core, or a changed
+// log wording, cannot leave startup waiting. A spawn error or an exit settles it at once.
 
 import { EventEmitter } from 'events'
 
@@ -10,28 +16,24 @@ export interface StartupChild extends EventEmitter {
 
 export interface StartupWatchOptions {
   platform: NodeJS.Platform
-  /** Normalized names of the profile's rule and proxy providers. */
-  providerNames: Set<string>
-  /** Names not seen yet; the watcher removes names as their start line appears. */
-  unmatchedProviders: Set<string>
-  normalize: (s: string) => string
+  /** Deadline for the controller line, counted from attaching the watcher. */
+  startupTimeoutMs: number
   /** Resolves once the core's API answers; rejects if it never does. */
   waitForApi: () => Promise<void>
-  /** Called for "Start TUN listening error ... operation not permitted"; returns the reason
-   *  `ready` rejects with. */
-  onTunPermissionError: () => unknown
   /** Windows: the core finished updating itself and must be restarted. */
   onUpdaterFinished: () => void
-  /** Without the expected provider lines, stop waiting after this long and check the API. */
-  readyTimeoutMs: number
+  /** Every line after the controller line. */
+  onLine: (line: string) => void
+  /** The core exited or failed to spawn; called once. */
+  onEnd: (reason: Error) => void
 }
 
 export interface StartupWatch {
-  /** Resolves when the controller listens; rejects on a listen error or an early exit. */
+  /** Resolves when the controller listens (or, after the deadline, when the API answers);
+   *  rejects on a listen error, a spawn error, an exit, or an API that does not answer. */
   controller: Promise<void>
-  /** Resolves when providers have started and the API answers; rejects on a TUN permission error,
-   *  an exit before that, or an API that does not answer after the timeout. */
-  ready: Promise<void>
+  /** Detaches the watcher and clears its timer (deliberate stop). */
+  stop: () => void
 }
 
 export class LineSplitter {
@@ -48,83 +50,85 @@ export class LineSplitter {
   }
 }
 
-function deferred(): { promise: Promise<void>; resolve: () => void; reject: (e: unknown) => void } {
-  let resolve!: () => void
-  let reject!: (e: unknown) => void
-  const promise = new Promise<void>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  // Handled by the caller or not needed; avoid unhandled rejection reports for the other one.
-  promise.catch(() => {})
-  return { promise, resolve, reject }
-}
-
 export function watchStartup(child: StartupChild, o: StartupWatchOptions): StartupWatch {
-  const controller = deferred()
-  const ready = deferred()
-  let controllerUp = false
-  let readySettled = false
+  let resolveController!: () => void
+  let rejectController!: (e: unknown) => void
+  const controller = new Promise<void>((res, rej) => {
+    resolveController = res
+    rejectController = rej
+  })
+  controller.catch(() => {})
+
+  let controllerSettled = false
+  let ended = false
   let checking = false
-  let timer: NodeJS.Timeout | undefined
 
   const win = o.platform === 'win32'
   const listenError = win ? 'External controller pipe listen error' : 'External controller unix listen error'
   const listening = win ? 'RESTful API pipe listening at' : 'RESTful API unix listening at'
 
-  const settleReady = (err?: unknown): void => {
-    if (readySettled) return
-    readySettled = true
-    if (timer) clearTimeout(timer)
-    if (err === undefined) ready.resolve()
-    else ready.reject(err)
-  }
-
-  const becomeReady = (): void => {
-    if (readySettled || checking) return
-    checking = true
-    o.waitForApi().then(
-      () => settleReady(),
-      (e) => settleReady(e)
-    )
+  const settleController = (err?: unknown): void => {
+    if (controllerSettled) return
+    controllerSettled = true
+    clearTimeout(timer)
+    if (err === undefined) resolveController()
+    else rejectController(err)
   }
 
   const onLine = (line: string): void => {
-    if (!controllerUp) {
+    if (!controllerSettled) {
       if (line.includes(listenError)) {
-        controller.reject(line)
-        settleReady(line)
+        settleController(line)
         return
       }
       if (win && line.includes('updater: finished')) o.onUpdaterFinished()
-      if (line.includes(listening)) {
-        controllerUp = true
-        controller.resolve()
-        timer = setTimeout(becomeReady, o.readyTimeoutMs)
-      }
+      if (line.includes(listening)) settleController()
       return
     }
-    if (readySettled) return
-    for (const m of line.matchAll(/Start initial provider ([^"]+)"/g)) {
-      o.unmatchedProviders.delete(o.normalize(m[1]))
-    }
-    if (line.includes('Start TUN listening error: configure tun interface: Connect: operation not permitted')) {
-      settleReady(o.onTunPermissionError())
-      return
-    }
-    const defaultOnly = o.providerNames.size === 0 && line.includes('Start initial compatible provider default')
-    const allMatched = o.providerNames.size > 0 && o.unmatchedProviders.size === 0
-    if (defaultOnly || allMatched) becomeReady()
+    o.onLine(line)
   }
 
   const lines = new LineSplitter(onLine)
-  child.stdout?.on('data', (d: Buffer | string) => lines.push(d.toString()))
-  child.once('exit', (code: number | null, signal: string | null) => {
-    lines.flush()
-    const why = new Error(`Core exited during startup (code ${code}, signal ${signal})`)
-    if (!controllerUp) controller.reject(why)
-    settleReady(why)
-  })
+  const onData = (d: Buffer | string): void => lines.push(d.toString())
 
-  return { controller: controller.promise, ready: ready.promise }
+  const detach = (): void => {
+    clearTimeout(timer)
+    child.stdout?.removeListener('data', onData)
+    child.removeListener('exit', onExit)
+    child.removeListener('error', onError)
+  }
+
+  const end = (reason: Error): void => {
+    if (ended) return
+    ended = true
+    lines.flush()
+    detach()
+    settleController(reason)
+    o.onEnd(reason)
+  }
+  const onExit = (code: number | null, signal: string | null): void =>
+    end(new Error(`Core exited (code ${code}, signal ${signal})`))
+  const onError = (e: Error): void => end(e instanceof Error ? e : new Error(String(e)))
+
+  const timer = setTimeout(() => {
+    if (controllerSettled || checking) return
+    checking = true
+    o.waitForApi().then(
+      () => settleController(),
+      (e) => settleController(e)
+    )
+  }, o.startupTimeoutMs)
+
+  child.stdout?.on('data', onData)
+  child.once('exit', onExit)
+  child.on('error', onError)
+
+  return {
+    controller,
+    stop: () => {
+      ended = true
+      detach()
+      settleController(new Error('Core stopped during startup'))
+    }
+  }
 }

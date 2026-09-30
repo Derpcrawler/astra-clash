@@ -1,3 +1,5 @@
+import { createQuitFlow } from './sys/quit-flow'
+import { beginShutdown } from './sys/shutdown'
 import { FORK } from './fork'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { registerIpcMainHandlers } from './utils/ipc'
@@ -26,7 +28,8 @@ import { execSync, spawn } from 'child_process'
 import { createElevateTaskSync, ELEVATE_TASK } from './sys/misc'
 import { initProfileUpdater } from './core/profileUpdater'
 import { existsSync, writeFileSync } from 'fs'
-import { exePath, taskDir } from './utils/dirs'
+import { exePath, logPath, taskDir } from './utils/dirs'
+import { writeFile } from 'fs/promises'
 import { showFloatingWindow } from './resolve/floatingWindow'
 import { getAppConfigSync } from './config/app'
 import { declineElevation, ELEVATION_DECLINED_ARG } from './utils/elevation'
@@ -192,13 +195,23 @@ app.on('open-url', async (_event, url) => {
   }
 })
 
-let isQuitting = false,
-  notQuitDialog = false
-
-let lastQuitAttempt = 0
+// Astra Clash: the before-quit decision lives in sys/quit-flow.ts; an accepted quit sets the shared
+// shutdown state (sys/shutdown.ts) that wake recovery checks.
+const quitFlow = createQuitFlow({
+  confirm: () => showQuitConfirmDialog(),
+  shutdown: async () => {
+    if (quitTimeout) {
+      clearTimeout(quitTimeout)
+      quitTimeout = null
+    }
+    triggerSysProxy(false, false)
+    await stopCore()
+    app.exit()
+  }
+})
 
 export function setNotQuitDialog(): void {
-  notQuitDialog = true
+  quitFlow.setNotQuitDialog()
 }
 
 function showWindow(): number {
@@ -243,49 +256,12 @@ app.on('window-all-closed', () => {
   // Don't quit app when all windows are closed
 })
 
-app.on('before-quit', async (e) => {
-  if (!isQuitting && !notQuitDialog) {
-    e.preventDefault()
-
-    const now = Date.now()
-    if (now - lastQuitAttempt < 500) {
-      isQuitting = true
-      if (quitTimeout) {
-        clearTimeout(quitTimeout)
-        quitTimeout = null
-      }
-      triggerSysProxy(false, false)
-      await stopCore()
-      app.exit()
-      return
-    }
-    lastQuitAttempt = now
-
-    const confirmed = await showQuitConfirmDialog()
-
-    if (confirmed) {
-      isQuitting = true
-      if (quitTimeout) {
-        clearTimeout(quitTimeout)
-        quitTimeout = null
-      }
-      triggerSysProxy(false, false)
-      await stopCore()
-      app.exit()
-    }
-  } else if (notQuitDialog) {
-    isQuitting = true
-    if (quitTimeout) {
-      clearTimeout(quitTimeout)
-      quitTimeout = null
-    }
-    triggerSysProxy(false, false)
-    await stopCore()
-    app.exit()
-  }
+app.on('before-quit', (e) => {
+  void quitFlow.onBeforeQuit(e)
 })
 
 powerMonitor.on('shutdown', async () => {
+  beginShutdown()
   if (quitTimeout) {
     clearTimeout(quitTimeout)
     quitTimeout = null
@@ -344,9 +320,16 @@ app.whenReady().then(async () => {
   const coreStartPromise = (async (): Promise<void> => {
     try {
       const [startPromise] = await startCore()
-      startPromise.then(async () => {
-        await initProfileUpdater()
-      })
+      // Astra Clash: startup can end without the providers (core exit, TUN permission error, a
+      // stop); that is logged instead of left as an unhandled rejection.
+      startPromise.then(
+        async () => {
+          await initProfileUpdater()
+        },
+        (e) => {
+          writeFile(logPath(), `[Manager]: core not ready: ${e}\n`, { flag: 'a' }).catch(() => {})
+        }
+      )
       coreStarted = true
     } catch (e) {
       showError(t('dialog.coreStartError'), `${e}`)

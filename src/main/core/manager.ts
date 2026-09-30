@@ -1,5 +1,7 @@
 import { DEFAULT_STOP_TIMINGS, isChildRunning, stopChildProcess } from './child-process'
-import { watchStartup } from './startup-watch'
+import { StartupWatch, watchStartup } from './startup-watch'
+import { ProviderTracker, ProviderWait } from './provider-tracker'
+import { isShuttingDown } from '../sys/shutdown'
 import { ChildProcess, execFile, execFileSync, spawn } from 'child_process'
 import {
   dataDir,
@@ -74,21 +76,70 @@ let networkDownHandled = false
 let child: ChildProcess
 let retry = 10
 
-let providerNames = new Set<string>()
-let unmatchedProviders = new Set<string>()
 
 const normalize = (s: string): string =>
   s
     .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
     .normalize('NFC')
 
-export async function resetProviderTracking(): Promise<void> {
+// Astra Clash: limits for core startup. Exported so tests can shorten them.
+export const STARTUP_LIMITS = {
+  /** Wait for the controller line before asking the API instead. */
+  controllerMs: 30_000,
+  /** Wait for the provider lines before asking the API instead. */
+  providersMs: 30_000,
+  /** API attempts, 100 ms apart, before startup counts as failed. */
+  apiTries: 30
+}
+
+// Astra Clash: provider start tracking for core starts and hot reloads (core/provider-tracker.ts).
+async function waitForApi(): Promise<void> {
+  for (let i = 0; i < STARTUP_LIMITS.apiTries; i++) {
+    try {
+      await mihomoGroups()
+      return
+    } catch {
+      await new Promise((r) => setTimeout(r, 100))
+    }
+  }
+  throw new Error(t('tray.coreStartError'))
+}
+
+const providerTracker = new ProviderTracker({
+  normalize,
+  waitForApi,
+  get timeoutMs() {
+    return STARTUP_LIMITS.providersMs
+  },
+  onTunPermissionError: () => {
+    patchControledMihomoConfig({ tun: { enable: false } })
+    mainWindow?.webContents.send('controledMihomoConfigUpdated')
+    ipcMain.emit('updateTrayMenu')
+    return t('tray.tunStartFailed')
+  }
+})
+
+let currentWatch: StartupWatch | null = null
+
+function notifyProvidersReady(): void {
+  mainWindow?.webContents.send('groupsUpdated')
+  mainWindow?.webContents.send('rulesUpdated')
+}
+
+/** After a successful hot reload: refresh groups and rules once its providers have started. */
+export function announceReload(wait: ProviderWait): void {
+  wait.ready.then(notifyProvidersReady, () => {})
+}
+
+// Starts a wait for the current runtime config's providers (core start or hot reload) and returns
+// its handle; the handle's cancel() ends only this wait.
+export async function resetProviderTracking(): Promise<ProviderWait> {
   const { 'rule-providers': ruleProviders, 'proxy-providers': proxyProviders } =
     await getRuntimeConfig()
-  providerNames = new Set(
+  const names = new Set(
     [...Object.keys(ruleProviders || {}), ...Object.keys(proxyProviders || {})].map(normalize)
   )
-  unmatchedProviders = new Set(providerNames)
+  return providerTracker.arm(names)
 }
 
 export async function startCore(detached = false): Promise<Promise<void>[]> {
@@ -129,7 +180,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
       })
     }
   }
-  await resetProviderTracking()
+  const { ready } = await resetProviderTracking()
   const stdout = createWriteStream(logPath(), { flags: 'a' })
   const stderr = createWriteStream(logPath(), { flags: 'a' })
   const env = {
@@ -140,6 +191,10 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
     SAFE_PATHS: safePaths.join(path.delimiter),
     PATH: process.env.PATH
   }
+  // Astra Clash: no new core once a quit is accepted (sys/shutdown.ts). Checked right before the
+  // spawn with no await in between, so a restart that was already under way cannot start a core
+  // behind a shutdown that began during its earlier steps.
+  if (isShuttingDown()) throw new ShutdownInProgress()
   child = spawn(
     corePath,
     [
@@ -177,30 +232,14 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   })
   child.stdout?.pipe(stdout)
   child.stderr?.pipe(stderr)
-  // Astra Clash: startup log read line by line from the first byte (core/startup-watch.ts).
-  const { controller, ready } = watchStartup(child, {
+  // Astra Clash: startup log read line by line from the first byte (core/startup-watch.ts); later
+  // lines feed provider tracking.
+  const watch = watchStartup(child, {
     platform: process.platform,
-    providerNames,
-    unmatchedProviders,
-    normalize,
-    readyTimeoutMs: 30_000,
-    waitForApi: async () => {
-      for (let i = 0; i < 30; i++) {
-        try {
-          await mihomoGroups()
-          return
-        } catch {
-          await new Promise((r) => setTimeout(r, 100))
-        }
-      }
-      throw new Error(t('tray.coreStartError'))
-    },
-    onTunPermissionError: () => {
-      patchControledMihomoConfig({ tun: { enable: false } })
-      mainWindow?.webContents.send('controledMihomoConfigUpdated')
-      ipcMain.emit('updateTrayMenu')
-      return t('tray.tunStartFailed')
-    },
+    startupTimeoutMs: STARTUP_LIMITS.controllerMs,
+    waitForApi,
+    onLine: (line) => providerTracker.feed(line),
+    onEnd: (reason) => providerTracker.failAll(reason),
     onUpdaterFinished: async () => {
       try {
         await stopCore(true)
@@ -211,9 +250,11 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
       }
     }
   })
+  currentWatch = watch
   try {
-    await controller
+    await watch.controller
   } catch (e) {
+    providerTracker.failAll(e)
     throw e instanceof Error ? e : `${t('tray.controllerListenError')}:\n${e}`
   }
   void (async (): Promise<void> => {
@@ -226,8 +267,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   return [
     ready.then(async () => {
       await new Promise((r) => setTimeout(r, 100))
-      mainWindow?.webContents.send('groupsUpdated')
-      mainWindow?.webContents.send('rulesUpdated')
+      notifyProvidersReady()
       await applyLogLevel(logLevel)
     })
   ]
@@ -251,6 +291,9 @@ export async function stopCore(force = false): Promise<void> {
 
   // Astra Clash: whether the core still runs comes from its exit status (core/child-process.ts),
   // not ChildProcess.killed, which turns true as soon as SIGINT is sent.
+  currentWatch?.stop()
+  currentWatch = null
+  providerTracker.cancelAll()
   if (isChildRunning(child)) {
     await stopChildProcess(child, DEFAULT_STOP_TIMINGS, (line) => {
       writeFile(logPath(), line, { flag: 'a' }).catch(() => {})
@@ -286,12 +329,21 @@ export function hasCoreProcess(): boolean {
   return isChildRunning(child)
 }
 
+export class ShutdownInProgress extends Error {
+  constructor() {
+    super('The app is shutting down')
+  }
+}
+
 export async function restartCore(): Promise<void> {
   try {
     await stopCore()
+    if (isShuttingDown()) return
     const promises = await startCore()
     await Promise.all(promises)
   } catch (e) {
+    // A restart that meets an accepted quit simply ends; nothing to report.
+    if (e instanceof ShutdownInProgress) return
     showError(t('tray.coreStartError'), `${e}`)
   }
 }

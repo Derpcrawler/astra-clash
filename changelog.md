@@ -1,3 +1,10 @@
+## 1.0.2
+
+- Starting or restarting the core no longer hangs when the core stays silent or fails to launch. The app checks whether the core responds and reports a failure if it does not.
+- Proxy groups and rules refresh after switching profiles or saving rules, also when several of these overlap.
+- Cancelling the Quit prompt no longer turns off reconnecting after the computer wakes from sleep.
+- Quitting while the app reconnects after sleep no longer starts the core again.
+
 ## 1.0.1
 
 - Downloading a newer core in Settings installs exactly the file that was checked. A file changed during the password prompt is refused, and the current core stays.
