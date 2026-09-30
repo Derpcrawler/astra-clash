@@ -307,15 +307,24 @@ export const mihomoUpgradeUI = async (): Promise<void> => {
 export const mihomoHotReloadConfig = async (): Promise<void> => {
   const { generateProfile } = await import('./factory')
   const { getProfileConfig } = await import('../config')
-  const { resetProviderTracking } = await import('./manager')
+  const { resetProviderTracking, announceReload } = await import('./manager')
   const { logLevel } = await generateProfile()
   const { current } = await getProfileConfig()
   const { diffWorkDir = false } = await getAppConfig()
   const { mihomoWorkConfigPath } = await import('../utils/dirs')
   const configPath = diffWorkDir ? mihomoWorkConfigPath(current) : mihomoWorkConfigPath('work')
-  await resetProviderTracking()
+  // Astra Clash: wait for the new config's providers, then tell the window to refresh groups and
+  // rules; a failed reload announces nothing.
+  // This reload's own wait: a failure cancels only it, never a newer reload's or a restart's wait.
+  const wait = await resetProviderTracking()
   const instance = await getAxios()
-  await instance.put('/configs?force=true', { path: configPath })
+  try {
+    await instance.put('/configs?force=true', { path: configPath })
+  } catch (e) {
+    wait.cancel()
+    throw e
+  }
+  announceReload(wait)
   await applyLogLevel(logLevel)
 }
 

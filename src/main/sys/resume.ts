@@ -1,10 +1,11 @@
-import { app, net, powerMonitor } from 'electron'
+import { net, powerMonitor } from 'electron'
 import { writeFile } from 'fs/promises'
 import { getAppConfig, getControledMihomoConfig } from '../config'
 import { hasCoreProcess, restartCore } from '../core/manager'
 import { mihomoHotReloadConfig, mihomoVersion } from '../core/mihomoApi'
 import { logPath } from '../utils/dirs'
 import { enableSysProxyUnlessChanged, sysProxyChangeCount } from './sysproxy'
+import { isShuttingDown } from './shutdown'
 
 // Astra Clash: recovery after the Mac wakes from sleep, ported from Mihomo Party 0e3116a. Sleep can
 // leave the core running but no longer routing: TUN's DNS listener stops answering, connections to
@@ -19,9 +20,6 @@ const networkWaitTimeout = 30000
 const networkWaitInterval = 1000
 
 let recovering = false
-// Set when the app starts quitting; recovery then stops before restarting the core or changing the
-// system proxy.
-let quitting = false
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -56,7 +54,7 @@ export async function recoverAfterResume(settleMs = settleDelay): Promise<void> 
 
     // No core process means it was stopped on purpose (quitting, or network detection stopped it
     // and will start it again), so there is nothing to recover.
-    if (quitting || !hasCoreProcess()) return
+    if (isShuttingDown() || !hasCoreProcess()) return
 
     // Any system proxy change after this point (Disconnect, switching the connection method)
     // is newer than this recovery, which then leaves the system proxy alone.
@@ -65,18 +63,20 @@ export async function recoverAfterResume(settleMs = settleDelay): Promise<void> 
     const { tun } = await getControledMihomoConfig()
 
     if (!(await coreAnswers())) {
-      if (quitting) return
       await log('Core does not answer after wake, restarting it')
+      // Checked after every await: a quit accepted during the log write must not restart the core.
+      if (isShuttingDown()) return
       await restartCore()
     } else if (tun?.enable || proxyMode) {
-      if (quitting) return
+      if (isShuttingDown()) return
       // The same reload that saving DNS settings runs: the core rebuilds DNS and TUN routing and
       // closes the connections that died during sleep.
       await mihomoHotReloadConfig()
       await log('Reloaded core config after wake')
     }
 
-    if (!quitting && proxyMode && sysProxy?.enable) {
+    // An accepted quit (sys/shutdown.ts) stops recovery; a cancelled quit prompt does not.
+    if (!isShuttingDown() && proxyMode && sysProxy?.enable) {
       // Sets the same values again, and retries by itself while the Mac is offline.
       if (!(await enableSysProxyUnlessChanged(since, onlyActiveDevice))) {
         await log('System proxy changed during recovery; left as it is')
@@ -90,9 +90,6 @@ export async function recoverAfterResume(settleMs = settleDelay): Promise<void> 
 }
 
 export function initResumeRecovery(): void {
-  app.on('before-quit', () => {
-    quitting = true
-  })
   powerMonitor.on('resume', () => {
     void recoverAfterResume()
   })

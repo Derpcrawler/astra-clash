@@ -1,6 +1,6 @@
 {
   "name": "astra-clash",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Desktop client for the mihomo proxy core",
   "main": "./out/main/index.js",
   "author": "Astra Clash",
