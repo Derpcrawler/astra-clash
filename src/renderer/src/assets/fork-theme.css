@@ -402,6 +402,14 @@
 .astra-content.compact {
   height: calc(100vh - 22px);
 }
+/* Home with window buttons drawn by the page (Linux without the system title bar): the 26 px
+   buttons sit centered in the strip with about 9 px below them. */
+.astra-ph-row.compact.with-wc {
+  height: 44px;
+}
+.astra-content.compact.with-wc {
+  height: calc(100vh - 44px);
+}
 
 /* Empty state */
 .astra-empty {
@@ -540,15 +548,16 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: var(--muted-foreground);
-  background: radial-gradient(
-    circle at 35% 30%,
-    color-mix(in srgb, var(--secondary) 80%, var(--foreground) 8%),
-    var(--secondary) 70%
-  );
+  /* Disconnected: the same glass as the panels, with a thin top highlight and edge, so the button
+     sits in the page instead of reading as a dark ball with a flat halo. */
+  color: var(--astra-fg2);
+  background: var(--astra-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   box-shadow:
-    0 0 0 1px var(--astra-line-strong),
-    0 0 0 8px color-mix(in srgb, var(--secondary) 55%, transparent);
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 0 0 1px var(--astra-line-strong),
+    0 12px 32px rgb(0 0 0 / 0.28);
   /* Only transform and color animate. The glow is a separate layer that fades (see ::before), so
      switching does not repaint a 70 px shadow on every frame while the jump starts. */
   transition:
@@ -578,12 +587,24 @@
 .astra-power:disabled {
   cursor: default;
 }
+/* Light: the palette accent tints the rim and icon; the shadow stays. */
+:root:not(.dark) .astra-power:not(.on) {
+  color: color-mix(in srgb, var(--astra-accent) 75%, var(--foreground));
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--astra-accent) 22%, transparent), transparent 62%),
+    var(--astra-glass);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 0 0 1px color-mix(in srgb, var(--astra-accent) 38%, transparent),
+    0 12px 32px rgb(0 0 0 / 0.28);
+}
+/* Connected: the palette gradient with an even sheen over the top half and a light top edge. */
 .astra-power.on {
   color: var(--astra-on);
   background:
-    radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--astra-accent) 70%, white), transparent 45%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 52%),
     linear-gradient(140deg, var(--astra-accent), var(--astra-accent2));
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
 }
 .astra-power.busy {
   transform: scale(0.95);
@@ -980,11 +1001,12 @@ html[data-platform='win32'] {
 html[data-platform='win32'] .astra-ph-row {
   padding-right: calc(22px + var(--astra-caption-w));
 }
+/* Pages without a title (Home) start 10 px below the caption buttons, not flush with them. */
 html[data-platform='win32'] .astra-ph-row.compact {
-  height: max(22px, var(--astra-caption-h));
+  height: max(22px, calc(var(--astra-caption-h) + 10px));
 }
 html[data-platform='win32'] .astra-content.compact {
-  height: calc(100vh - max(22px, var(--astra-caption-h)));
+  height: calc(100vh - max(22px, calc(var(--astra-caption-h) + 10px)));
 }
 /* No traffic lights on the left, so the name sits level with the page titles. */
 html[data-platform='win32'] .astra-side-top {

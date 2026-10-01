@@ -1,3 +1,18 @@
+## 1.0.5
+
+### New
+
+- Linux support: .deb, .rpm and Arch packages for x64.
+- MIPS TUN stack (experimental). Mixed stays the default.
+
+### Improved
+
+- Small interface improvements and tweaks.
+
+### Fixed
+
+- Bug fixes.
+
 ## 1.0.2
 
 - Starting or restarting the core no longer hangs when the core stays silent or fails to launch. The app checks whether the core responds and reports a failure if it does not.

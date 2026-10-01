@@ -682,6 +682,7 @@ export default {
       taskScheduleNote3: 'After unregistration, some features may require manual elevation',
       authorized: 'Authorized',
       unauthorized: 'Unauthorized',
+      incomplete: 'Incomplete',
       revokeAuthorization: 'Revoke Authorization',
       authorizeCore: 'Authorize Core',
       grantNote1: 'After authorization, the core will gain the required system permissions',

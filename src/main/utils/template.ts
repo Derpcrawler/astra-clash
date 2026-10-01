@@ -5,7 +5,8 @@ export const defaultConfig: AppConfig = {
   palette: 'm45',
   starField: true,
   connectJump: true,
-  useWindowFrame: false,
+  // Astra Clash: Linux has no native buttons over a frameless window, so it uses the system title bar.
+  useWindowFrame: process.platform === 'linux',
   proxyInTray: true,
   useCustomTrayMenu: false,
   maxLogDays: 7,

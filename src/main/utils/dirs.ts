@@ -2,10 +2,12 @@ import { is } from '@electron-toolkit/utils'
 import { existsSync, mkdirSync, readdirSync } from 'fs'
 import { app } from 'electron'
 import path from 'path'
+import os from 'os'
 import { execSync } from 'child_process'
 import { getAppConfigSync } from '../config/app'
 import { checkCorePermissionSync } from '../core/manager'
 import { t } from './i18n'
+import { privateSocketDir } from '../astra/private-dir'
 
 export const homeDir = app.getPath('home')
 
@@ -63,6 +65,7 @@ export function mihomoIpcPath(): string {
     return '\\\\.\\pipe\\Astra-Clash\\mihomo'
   }
   const { core = 'mihomo' } = getAppConfigSync()
+  if (process.platform === 'linux') return linuxIpcPath(core === 'system' ? 'external' : 'api')
   if (core === 'system') {
     return '/tmp/astra-clash-mihomo-external.sock'
   }
@@ -70,6 +73,23 @@ export function mihomoIpcPath(): string {
     return '/tmp/astra-clash-mihomo-api-noperm.sock'
   }
   return '/tmp/astra-clash-mihomo-api.sock'
+}
+
+// Astra Clash: on Linux the core runs as the user (with file capabilities, not setuid root), so one
+// name per core kind is enough. The socket goes in a folder only this user can open
+// (astra/private-dir.ts): the runtime folder, else one in the data folder, else a short one in the
+// temp folder when the others are unsuitable or too long. Checked on every call.
+function linuxIpcPath(kind: 'api' | 'external'): string {
+  const uid = process.getuid?.() ?? -1
+  const dir = privateSocketDir(
+    [
+      { dir: process.env.XDG_RUNTIME_DIR, create: false },
+      { dir: path.join(dataDir(), 'run'), create: true },
+      { dir: path.join(os.tmpdir(), `astra-clash-${uid}`), create: true }
+    ],
+    uid
+  )
+  return path.join(dir, `astra-clash-mihomo-${kind}.sock`)
 }
 
 export function serviceIpcPath(): string {

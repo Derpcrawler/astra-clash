@@ -4,9 +4,14 @@
 
 <h1 align="center">Astra Clash</h1>
 
-<p align="center">A desktop client for the <a href="https://github.com/MetaCubeX/mihomo">mihomo</a> proxy core, for macOS and Windows.</p>
+<p align="center">A good-looking desktop client for the <a href="https://github.com/MetaCubeX/mihomo">mihomo</a> proxy core.<br>macOS, Windows and Linux.</p>
 
-Add a subscription link and press the power button. Traffic goes through the proxy either in TUN mode (a virtual network interface that covers every app) or as the system proxy.
+<p align="center">
+  <a href="https://github.com/Derpcrawler/astra-clash/releases/latest"><img src="https://img.shields.io/github/v/release/Derpcrawler/astra-clash?label=latest"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
+</p>
+
+Paste your subscription link, press the power button, and you're connected. Astra Clash routes traffic in TUN mode, a virtual network interface that covers every app, or as the system proxy.
 
 ## Screenshots
 
@@ -17,56 +22,83 @@ Add a subscription link and press the power button. Traffic goes through the pro
 
 ## Features
 
-- One button to connect, in TUN mode or as the system proxy.
-- Node picker on Home, plus pages for proxy groups, rules, connections and logs.
-- Subscription details from your provider: traffic and days left, update interval, support link. Works with panels that serve mihomo configs, such as Remnawave.
-- Menu bar menu (tray on Windows) with profiles, proxy groups, outbound mode and connection method.
-- 13 color palettes in light and dark.
-- English, Russian and Chinese.
+- [x] Modern interface: a calm star field, glass panels, 13 color palettes, light and dark
+- [x] One button to connect, in TUN mode or as the system proxy
+- [x] TUN mode that works out of the box
+- [x] Subscription details from your provider: traffic and days left, update interval, support link; works with Remnawave and other panels that serve mihomo configs
+- [x] Node picker on Home, proxy groups with latency tests, rules, live connections and logs
+- [x] Most mihomo settings in the app: TUN, DNS, sniffer, system proxy and PAC
+- [x] Profile editor with validation, and one-click import from `clash://` links
+- [x] Built-in mihomo cores, stable and alpha
+- [x] Menu bar or tray menu with profiles, proxy groups, outbound mode and connection method
+- [x] Global shortcuts, start at login, floating speed window
+- [x] English, Russian and Chinese
 
 ## Download
 
-From the [Releases](https://github.com/Derpcrawler/astra-clash/releases) page.
+Get the latest version from [Releases](https://github.com/Derpcrawler/astra-clash/releases/latest).
 
-| Platform | File |
+| System | File |
 |---|---|
 | macOS 13 or later, Apple Silicon | `Astra-Clash_<version>_arm64.pkg` |
 | Windows 10 or 11, x64 | `Astra-Clash_<version>_x64-setup.exe` |
+| Debian, Ubuntu and derivatives, x64 | `Astra-Clash_<version>_amd64.deb` |
+| Fedora, openSUSE, x64 | `Astra-Clash_<version>_x86_64.rpm` |
+| Arch and derivatives, x64 | `Astra-Clash_<version>_x64.pkg.tar.xz` |
 
-There are no Linux builds. Linux users can build from source (see below).
+### First launch
 
-The builds are not signed with an Apple or Microsoft certificate, so each system warns once:
+The builds are not signed with an Apple or Microsoft certificate, so macOS and Windows ask for confirmation once:
 
-- **macOS:** the installer is blocked because it comes from an unidentified developer. Open System Settings, Privacy & Security, click Open Anyway next to the message about the installer, and run it again. The installer asks for an administrator password; it sets up the core so TUN mode works without asking again.
-- **Windows:** SmartScreen shows "Windows protected your PC". Click More info, then Run anyway. The app asks for administrator rights when it starts, because TUN mode needs them.
+- **macOS:** open System Settings, Privacy & Security, click Open Anyway next to the message about the installer, and run it again.
+- **Windows:** in the "Windows protected your PC" message, click More info, then Run anyway.
+- **Linux:** install the package with your package manager, for example `sudo apt install ./Astra-Clash_<version>_amd64.deb`.
 
-The Windows build is new and has not been tested much yet.
-
-To update, install the new version over the old one. Settings are kept.
+Found a bug? [Open an issue](https://github.com/Derpcrawler/astra-clash/issues).
 
 ## Build from source
 
-Requirements: Node.js 20 or later, pnpm 10, and Go 1.21 or later for the Windows build.
+You need Node.js 20 or later, pnpm 10 and Git. Building for Windows also needs Go 1.21 or later.
 
 ```bash
 git clone https://github.com/Derpcrawler/astra-clash.git
 cd astra-clash
-pnpm install   # also downloads mihomo, geo data and helper binaries for this machine
+pnpm install   # also downloads mihomo, geo data and helpers for this system
 pnpm dev
 ```
 
-Packages:
+Packages, built on the system you are packaging for:
 
 ```bash
-pnpm build:mac --arm64                  # dist/Astra-Clash_<version>_arm64.pkg
-
-node scripts/prepare.mjs --x64 --win    # Windows binaries, can be run on macOS
-pnpm build:win --x64                    # dist/Astra-Clash_<version>_x64-setup.exe
+pnpm build:mac --arm64      # .pkg
+pnpm build:win --x64        # .exe installer
+pnpm build:linux --x64      # .deb, .rpm and .pkg.tar.xz
+pnpm build:linux deb --x64  # one format only: deb, rpm or pacman
 ```
 
-`scripts/prepare.mjs` removes the binaries for other platforms, so run it again for the platform you build next (`--arm64 --mac` for macOS).
+Packages land in `dist/`.
 
-Linux: `node scripts/prepare.mjs --x64 --linux`, then `pnpm build:linux`. This is untested. The script stops at `sparkle-service`, because only the macOS and Windows downloads are pinned by SHA-256. Check the binary, then add its hash to `scripts/prepare.mjs`.
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Start the app with hot reload for the interface (restart for main process changes) |
+| `pnpm test` | Run the tests |
+| `pnpm typecheck` | Check types |
+| `pnpm lint` | Run ESLint |
+
+<details>
+<summary>Building for another system</summary>
+
+`pnpm install` downloads the core and helpers for the system you're on. To package for another one, fetch its binaries first; this replaces the current ones, so run it again for your own system afterwards.
+
+```bash
+node scripts/prepare.mjs --x64 --win     # then pnpm build:win --x64
+node scripts/prepare.mjs --x64 --linux   # then pnpm build:linux --x64
+node scripts/prepare.mjs --arm64 --mac   # back to macOS binaries
+```
+
+Linux packages built on macOS need `rpmbuild` (`brew install rpm`) and GNU `ar` first on your PATH (`brew install binutils`, then add `$(brew --prefix binutils)/bin`). With the macOS `ar`, the .deb comes out empty.
+
+</details>
 
 ## Credits
 

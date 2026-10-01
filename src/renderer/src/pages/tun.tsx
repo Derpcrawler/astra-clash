@@ -165,6 +165,7 @@ const Tun: React.FC = () => {
                 <TabsTrigger value="gvisor">gVisor</TabsTrigger>
                 <TabsTrigger value="mixed">Mixed</TabsTrigger>
                 <TabsTrigger value="system">System</TabsTrigger>
+                <TabsTrigger value="mips">MIPS</TabsTrigger>
               </TabsList>
             </Tabs>
           </SettingItem>

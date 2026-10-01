@@ -23,15 +23,33 @@ export function isChildRunning(child: ChildProcess | undefined | null): boolean 
   return !!child && !!child.pid && child.exitCode === null && child.signalCode === null
 }
 
+// A stop already under way for a process. A second stop joins it: starting another would remove
+// the first stop's exit listener (removeAllListeners below), leaving the first to wait for its
+// give-up time.
+const stopsInProgress = new WeakMap<ChildProcess, Promise<void>>()
+
 /**
  * Stops a child process: SIGINT, then SIGTERM, then SIGKILL while it keeps running. Resolves when
  * the process exits, or after giveUpAfterMs at the latest. `log` receives a line when escalation
- * reaches SIGKILL or the wait gives up.
+ * reaches SIGKILL or the wait gives up. A second call for the same process while it is stopping
+ * returns the same promise.
  */
 export function stopChildProcess(
   child: ChildProcess,
   timings: StopTimings = DEFAULT_STOP_TIMINGS,
   log: (line: string) => void = () => {}
+): Promise<void> {
+  const existing = stopsInProgress.get(child)
+  if (existing) return existing
+  const stop = startStop(child, timings, log).finally(() => stopsInProgress.delete(child))
+  stopsInProgress.set(child, stop)
+  return stop
+}
+
+function startStop(
+  child: ChildProcess,
+  timings: StopTimings,
+  log: (line: string) => void
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     if (!isChildRunning(child)) {
@@ -81,5 +99,29 @@ export function stopChildProcess(
         finish()
       }, timings.giveUpAfterMs)
     )
+  })
+}
+
+/**
+ * Sends SIGKILL right away if the process is still running, for the last moment before the app
+ * exits, when the normal SIGINT/SIGTERM/SIGKILL sequence has no time left. Resolves when the
+ * process has exited, or after waitMs.
+ */
+export function killChildNow(child: ChildProcess, waitMs = 500): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (!isChildRunning(child)) {
+      resolve()
+      return
+    }
+    const timer = setTimeout(resolve, waitMs)
+    child.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      // The process may have exited between the check and the signal.
+    }
   })
 }

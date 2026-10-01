@@ -1,0 +1,29 @@
+#!/bin/bash
+# Astra Clash: runs after the package files are removed. It cleans up only when the app is really
+# uninstalled, never on an upgrade, where the new version has already set these up:
+#   deb postrm:         "remove" or "purge" on uninstall; "upgrade", "failed-upgrade", "abort-*",
+#                       "disappear" otherwise
+#   rpm %postun:        the number of installed versions left: 0 on uninstall, 1 or more on upgrade
+#   pacman post_remove: called only on uninstall, with the removed version
+case "$1" in
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear) exit 0 ;;
+    [1-9]|[1-9][0-9]) exit 0 ;;
+esac
+
+# The command link: unregister the target postinst registered, or remove a plain link that still
+# points at this app.
+if type update-alternatives >/dev/null 2>&1; then
+    update-alternatives --remove 'astra-clash' '/opt/Astra Clash/astra-clash' >/dev/null 2>&1 || true
+fi
+if [ -L '/usr/bin/astra-clash' ] && [ "$(readlink '/usr/bin/astra-clash')" = '/opt/Astra Clash/astra-clash' ]; then
+    rm -f '/usr/bin/astra-clash'
+fi
+
+# The AppArmor profile postinst installed (Ubuntu 24 and later).
+APPARMOR_PROFILE='/etc/apparmor.d/astra-clash'
+if [ -f "$APPARMOR_PROFILE" ]; then
+    if hash apparmor_parser 2>/dev/null; then
+        apparmor_parser --remove "$APPARMOR_PROFILE" >/dev/null 2>&1 || true
+    fi
+    rm -f "$APPARMOR_PROFILE"
+fi

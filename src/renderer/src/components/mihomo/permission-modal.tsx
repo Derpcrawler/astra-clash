@@ -31,8 +31,9 @@ interface Props {
 const PermissionModal: React.FC<Props> = (props) => {
   const { onChange, onRevoke, onGrant } = props
   const [loading, setLoading] = useState<{ mihomo?: boolean; 'mihomo-alpha'?: boolean }>({})
+  // Astra Clash: 'partial' (Linux) is some capability set without what TUN needs; it offers Revoke.
   const [hasPermission, setHasPermission] = useState<
-    { mihomo: boolean; 'mihomo-alpha': boolean } | boolean | null
+    { mihomo: boolean | 'partial'; 'mihomo-alpha': boolean | 'partial' } | boolean | null
   >(null)
   const isWindows = platform === 'win32'
 
@@ -107,6 +108,7 @@ const PermissionModal: React.FC<Props> = (props) => {
         ? t('mihomo.permissionModal.authorized')
         : t('mihomo.permissionModal.unauthorized')
     }
+    if (hasPermission[coreName] === 'partial') return t('mihomo.permissionModal.incomplete')
     return hasPermission[coreName]
       ? t('mihomo.permissionModal.authorized')
       : t('mihomo.permissionModal.unauthorized')
@@ -117,7 +119,7 @@ const PermissionModal: React.FC<Props> = (props) => {
     if (typeof hasPermission === 'boolean') {
       return hasPermission ? 'bg-success text-white' : 'bg-warning text-white'
     }
-    return hasPermission[coreName] ? 'bg-success text-white' : 'bg-warning text-white'
+    return hasPermission[coreName] === true ? 'bg-success text-white' : 'bg-warning text-white'
   }
 
   return (

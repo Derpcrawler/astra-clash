@@ -1,7 +1,8 @@
-import { DEFAULT_STOP_TIMINGS, isChildRunning, stopChildProcess } from './child-process'
+import { DEFAULT_STOP_TIMINGS, isChildRunning, killChildNow, stopChildProcess } from './child-process'
 import { StartupWatch, watchStartup } from './startup-watch'
-import { ProviderTracker, ProviderWait } from './provider-tracker'
+import { ProviderTracker, ProviderWait, ProviderWaitCancelled } from './provider-tracker'
 import { isShuttingDown } from '../sys/shutdown'
+import { hasCoreCapsSync, isPkexecCancel, readCapsState, setCoreCaps } from '../astra/core-caps'
 import { ChildProcess, execFile, execFileSync, spawn } from 'child_process'
 import {
   dataDir,
@@ -274,6 +275,26 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
 }
 
 export async function stopCore(force = false): Promise<void> {
+  stopMihomoTraffic()
+  stopMihomoConnections()
+  stopMihomoLogs()
+  stopMihomoMemory()
+
+  // Astra Clash: whether the core still runs comes from its exit status (core/child-process.ts),
+  // not ChildProcess.killed, which turns true as soon as SIGINT is sent. The core gets SIGINT
+  // before the DNS restore, which has no time limit of its own: a quit that runs out of time then
+  // meets a core that already had its chance to stop (astra/shutdown-sequence.ts).
+  currentWatch?.stop()
+  currentWatch = null
+  providerTracker.cancelAll()
+  // The core this stop is about. While the DNS restore runs, a restart elsewhere can start a new
+  // core; only this one may be forgotten at the end.
+  const target = child
+  const stopping = isChildRunning(target)
+    ? stopChildProcess(target, DEFAULT_STOP_TIMINGS, (line) => {
+        writeFile(logPath(), line, { flag: 'a' }).catch(() => {})
+      })
+    : Promise.resolve()
   try {
     if (!force) {
       await recoverDNS()
@@ -281,25 +302,10 @@ export async function stopCore(force = false): Promise<void> {
   } catch (error) {
     await writeFile(logPath(), `[Manager]: recover dns failed, ${error}`, {
       flag: 'a'
-    })
+    }).catch(() => {})
   }
-
-  stopMihomoTraffic()
-  stopMihomoConnections()
-  stopMihomoLogs()
-  stopMihomoMemory()
-
-  // Astra Clash: whether the core still runs comes from its exit status (core/child-process.ts),
-  // not ChildProcess.killed, which turns true as soon as SIGINT is sent.
-  currentWatch?.stop()
-  currentWatch = null
-  providerTracker.cancelAll()
-  if (isChildRunning(child)) {
-    await stopChildProcess(child, DEFAULT_STOP_TIMINGS, (line) => {
-      writeFile(logPath(), line, { flag: 'a' }).catch(() => {})
-    })
-  }
-  child = undefined as unknown as ChildProcess
+  await stopping
+  if (child === target) child = undefined as unknown as ChildProcess
 
   await getAxios(true).catch(() => {})
 
@@ -325,6 +331,12 @@ export async function stopCore(force = false): Promise<void> {
   }
 }
 
+// Astra Clash: the quit's last step before every exit (astra/shutdown-sequence.ts): SIGKILL for the
+// tracked core if it is still running, a no-op after a clean stop.
+export function forceKillCore(): Promise<void> {
+  return child && isChildRunning(child) ? killChildNow(child) : Promise.resolve()
+}
+
 export function hasCoreProcess(): boolean {
   return isChildRunning(child)
 }
@@ -335,17 +347,28 @@ export class ShutdownInProgress extends Error {
   }
 }
 
-export async function restartCore(): Promise<void> {
-  try {
+// Astra Clash: restarts run one at a time: each stops the core and starts the next before the
+// following restart begins, so two quick restarts cannot both start a core. The wait for the new
+// core's providers happens outside the queue; when a later restart stops that core first, the
+// cancelled wait ends quietly instead of showing an error.
+let restartQueue: Promise<unknown> = Promise.resolve()
+
+export function restartCore(): Promise<void> {
+  const step = restartQueue.then(async () => {
     await stopCore()
-    if (isShuttingDown()) return
-    const promises = await startCore()
-    await Promise.all(promises)
-  } catch (e) {
-    // A restart that meets an accepted quit simply ends; nothing to report.
-    if (e instanceof ShutdownInProgress) return
-    showError(t('tray.coreStartError'), `${e}`)
-  }
+    if (isShuttingDown()) return null
+    return startCore()
+  })
+  restartQueue = step.catch(() => {})
+  return step
+    .then(async (promises) => {
+      if (promises) await Promise.all(promises)
+    })
+    .catch((e) => {
+      // A restart that meets an accepted quit, or is overtaken by a later one, simply ends.
+      if (e instanceof ShutdownInProgress || e instanceof ProviderWaitCancelled) return
+      showError(t('tray.coreStartError'), `${e}`)
+    })
 }
 
 export async function keepCoreAlive(): Promise<void> {
@@ -403,6 +426,18 @@ export async function manualGrantCorePermition(
 ): Promise<void> {
   const execFilePromise = promisify(execFile)
 
+  // Astra Clash: Linux grants file capabilities, not setuid root (astra/core-caps.ts).
+  if (process.platform === 'linux') {
+    const targets = (cores || ['mihomo', 'mihomo-alpha']).map((c) => mihomoCorePath(c))
+    try {
+      await setCoreCaps(targets, true)
+    } catch (error) {
+      if (isPkexecCancel(error) || isUserCancelledError(error)) throw new UserCancelledError()
+      throw error
+    }
+    return
+  }
+
   const grantPermission = async (coreName: 'mihomo' | 'mihomo-alpha'): Promise<void> => {
     const corePath = mihomoCorePath(coreName)
     try {
@@ -411,13 +446,6 @@ export async function manualGrantCorePermition(
         const shell = `chown root:admin \\"${escapedPath}\\" && chmod +sx \\"${escapedPath}\\"`
         const command = `do shell script "${shell}" with administrator privileges`
         await execFilePromise('osascript', ['-e', command])
-      }
-      if (process.platform === 'linux') {
-        await execFilePromise('pkexec', [
-          'bash',
-          '-c',
-          `chown root:root "${corePath}" && chmod +sx "${corePath}"`
-        ])
       }
     } catch (error) {
       if (isUserCancelledError(error)) {
@@ -433,6 +461,7 @@ export async function manualGrantCorePermition(
 
 export function checkCorePermissionSync(coreName: 'mihomo' | 'mihomo-alpha'): boolean {
   if (process.platform === 'win32') return true
+  if (process.platform === 'linux') return hasCoreCapsSync(mihomoCorePath(coreName))
   try {
     const corePath = mihomoCorePath(coreName)
     const stdout = execFileSync('ls', ['-l', corePath], { encoding: 'utf8' })
@@ -443,10 +472,18 @@ export function checkCorePermissionSync(coreName: 'mihomo' | 'mihomo-alpha'): bo
   }
 }
 
-export async function checkCorePermission(): Promise<{ mihomo: boolean; 'mihomo-alpha': boolean }> {
+// Astra Clash: on Linux 'partial' means some capability is set but TUN would not work; the dialog
+// shows it so the rest can be removed or completed.
+type CorePermission = boolean | 'partial'
+
+export async function checkCorePermission(): Promise<{ mihomo: CorePermission; 'mihomo-alpha': CorePermission }> {
   const execFilePromise = promisify(execFile)
 
-  const checkPermission = async (coreName: 'mihomo' | 'mihomo-alpha'): Promise<boolean> => {
+  const checkPermission = async (coreName: 'mihomo' | 'mihomo-alpha'): Promise<CorePermission> => {
+    if (process.platform === 'linux') {
+      const state = await readCapsState(mihomoCorePath(coreName)).catch(() => 'none' as const)
+      return state === 'full' ? true : state === 'partial' ? 'partial' : false
+    }
     try {
       const corePath = mihomoCorePath(coreName)
       const { stdout } = await execFilePromise('ls', ['-l', corePath])
@@ -471,6 +508,25 @@ export async function checkCorePermission(): Promise<{ mihomo: boolean; 'mihomo-
 export async function revokeCorePermission(cores?: ('mihomo' | 'mihomo-alpha')[]): Promise<void> {
   const execFilePromise = promisify(execFile)
 
+  // Astra Clash: Linux removes any file capability a core has, complete or not (astra/core-caps.ts),
+  // then checks that none is left. setcap -r fails on a file without capabilities, so only cores
+  // that have some are passed; a core whose capabilities cannot be read stops the revoke.
+  if (process.platform === 'linux') {
+    const paths = (cores || ['mihomo', 'mihomo-alpha']).map((c) => mihomoCorePath(c)).filter((p) => existsSync(p))
+    const withCaps: string[] = []
+    for (const p of paths) if ((await readCapsState(p)) !== 'none') withCaps.push(p)
+    try {
+      await setCoreCaps(withCaps, false)
+    } catch (error) {
+      if (isPkexecCancel(error) || isUserCancelledError(error)) throw new UserCancelledError()
+      throw error
+    }
+    for (const p of withCaps) {
+      if ((await readCapsState(p)) !== 'none') throw new Error(`Capabilities are still set on ${p}`)
+    }
+    return
+  }
+
   const revokePermission = async (coreName: 'mihomo' | 'mihomo-alpha'): Promise<void> => {
     const corePath = mihomoCorePath(coreName)
     try {
@@ -479,9 +535,6 @@ export async function revokeCorePermission(cores?: ('mihomo' | 'mihomo-alpha')[]
         const shell = `chmod a-s \\"${escapedPath}\\"`
         const command = `do shell script "${shell}" with administrator privileges`
         await execFilePromise('osascript', ['-e', command])
-      }
-      if (process.platform === 'linux') {
-        await execFilePromise('pkexec', ['bash', '-c', `chmod a-s "${corePath}"`])
       }
     } catch (error) {
       if (isUserCancelledError(error)) {
@@ -592,8 +645,14 @@ export async function startNetworkDetection(): Promise<void> {
   networkDetectionTimer = setInterval(async () => {
     if (isAnyNetworkInterfaceUp(extendedBypass) && net.isOnline()) {
       if ((networkDownHandled && !child) || (child && !isChildRunning(child))) {
-        const promises = await startCore()
-        await Promise.all(promises)
+        // Astra Clash: a failed or cancelled start here is logged, not left unhandled.
+        try {
+          const promises = await startCore()
+          await Promise.all(promises)
+        } catch (e) {
+          await writeFile(logPath(), `[Manager]: start after network up failed, ${e}\n`, { flag: 'a' }).catch(() => {})
+          return
+        }
         if (writeSysProxy) triggerSysProxy(true, onlyActiveDevice)
         networkDownHandled = false
       }

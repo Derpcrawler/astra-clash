@@ -57,7 +57,7 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
     disableTray = false,
     showFloatingWindow: showFloating = false,
     spinFloatingIcon = true,
-    useWindowFrame = false,
+    useWindowFrame = platform === 'linux',
     customTheme = 'default.css',
     palette = DEFAULT_PALETTE,
     starField = true,

@@ -49,6 +49,13 @@ type DriverConfig = {
   steps: DriveStep[]
   onDestroyed?: () => void
   onCloseClick?: (element: Element | undefined, step: DriveStep, options: DriverStepOptions) => void
+  onHighlightStarted?: (
+    element: Element | undefined,
+    step: DriveStep,
+    options: { config: DriverConfig }
+  ) => void
+  stagePadding?: number
+  stageRadius?: number
   onPopoverRender?: (popover: PopoverDOM, options: { config: DriverConfig; state: unknown; driver: Driver }) => void
 }
 
@@ -681,6 +688,13 @@ async function createDriverWithMode(mode: GuideMode): Promise<Driver> {
     progressText: '{{current}} / {{total}}',
     overlayOpacity: 0.9,
     steps: buildGuideSteps(mode),
+    // Astra Clash: a step without an element highlights an empty point in the middle of the window;
+    // with the usual padding that point shows as a small square hole in the overlay. driver.js reads
+    // these values from the live config each time it draws.
+    onHighlightStarted: (element, _step, options): void => {
+      options.config.stagePadding = element ? 10 : 0
+      options.config.stageRadius = element ? 5 : 0
+    },
     onCloseClick: (_element, _step, options): void => {
       markMainGuideCompleted()
       options.driver.destroy()

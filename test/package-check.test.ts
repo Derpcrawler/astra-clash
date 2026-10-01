@@ -1,5 +1,6 @@
 // The package check (build/astra-check-package.cjs) runs after every package build. It rejects an
-// app.asar with files outside the app or with private markers, and accepts a clean one.
+// app.asar with files outside the app or with private markers, accepts a clean one, and stops when
+// the marker list it was given does not exist.
 import { describe, expect, it } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
@@ -55,5 +56,16 @@ describe('package content check', () => {
     const { archive, dir } = await pack({ ...CLEAN, 'out/main/index.js': '// PRIVATE-MARKER' })
     expect(check(archive, asar, [/PRIVATE-MARKER/])).toEqual(['out/main/index.js contains /PRIVATE-MARKER/'])
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('stops when ASTRA_PACKAGE_MARKERS names a missing file', async () => {
+    const { archive, dir } = await pack(CLEAN)
+    process.env.ASTRA_PACKAGE_MARKERS = join(dir, 'no-such-markers.txt')
+    try {
+      expect(() => check(archive, asar)).toThrow(/does not exist/)
+    } finally {
+      delete process.env.ASTRA_PACKAGE_MARKERS
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

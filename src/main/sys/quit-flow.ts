@@ -14,6 +14,8 @@ export interface QuitFlowDeps {
 
 export interface QuitFlow {
   setNotQuitDialog: () => void
+  /** The system is shutting down: run the shutdown without asking, or join the one running. */
+  shutdownNow: () => Promise<void>
   onBeforeQuit: (event: { preventDefault: () => void }) => Promise<void>
 }
 
@@ -23,19 +25,30 @@ export function createQuitFlow(deps: QuitFlowDeps): QuitFlow {
   let notQuitDialog = false
   let lastQuitAttempt = 0
 
-  const accept = async (): Promise<void> => {
-    isQuitting = true
-    beginShutdown()
-    await deps.shutdown()
+  // One shutdown per process: a second quit request while it runs joins it instead of starting
+  // another.
+  let shutdownTask: Promise<void> | null = null
+  const accept = (): Promise<void> => {
+    if (!shutdownTask) {
+      isQuitting = true
+      beginShutdown()
+      shutdownTask = deps.shutdown()
+    }
+    return shutdownTask
   }
 
   return {
     setNotQuitDialog: () => {
       notQuitDialog = true
     },
+    shutdownNow: () => accept(),
     onBeforeQuit: async (event) => {
-      if (!isQuitting && !notQuitDialog) {
-        event.preventDefault()
+      // Electron does not wait for an async listener: if the default quit went ahead, the process
+      // could end before the shutdown steps finish. It is always prevented; the shutdown steps end
+      // with an explicit exit.
+      event.preventDefault()
+      if (isQuitting) return
+      if (!notQuitDialog) {
         const at = now()
         if (at - lastQuitAttempt < 500) {
           await accept()
@@ -43,7 +56,7 @@ export function createQuitFlow(deps: QuitFlowDeps): QuitFlow {
         }
         lastQuitAttempt = at
         if (await deps.confirm()) await accept()
-      } else if (notQuitDialog) {
+      } else {
         await accept()
       }
     }
