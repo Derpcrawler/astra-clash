@@ -4,14 +4,12 @@
 
 <h1 align="center">Astra Clash</h1>
 
-<p align="center">A good-looking desktop client for the <a href="https://github.com/MetaCubeX/mihomo">mihomo</a> proxy core.<br>macOS, Windows and Linux.</p>
+<p align="center"><a href="https://github.com/MetaCubeX/mihomo">mihomo</a> client for macOS, Windows and Linux</p>
 
 <p align="center">
   <a href="https://github.com/Derpcrawler/astra-clash/releases/latest"><img src="https://img.shields.io/github/v/release/Derpcrawler/astra-clash?label=latest"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
 </p>
-
-Paste your subscription link, press the power button, and you're connected. Astra Clash routes traffic in TUN mode, a virtual network interface that covers every app, or as the system proxy.
 
 ## Screenshots
 
@@ -22,17 +20,16 @@ Paste your subscription link, press the power button, and you're connected. Astr
 
 ## Features
 
-- [x] Modern interface: a calm star field, glass panels, 13 color palettes, light and dark
-- [x] One button to connect, in TUN mode or as the system proxy
-- [x] TUN mode that works out of the box
-- [x] Subscription details from your provider: traffic and days left, update interval, support link; works with Remnawave and other panels that serve mihomo configs
-- [x] Node picker on Home, proxy groups with latency tests, rules, live connections and logs
-- [x] Most mihomo settings in the app: TUN, DNS, sniffer, system proxy and PAC
-- [x] Profile editor with validation, and one-click import from `clash://` links
-- [x] Built-in mihomo cores, stable and alpha
-- [x] Menu bar or tray menu with profiles, proxy groups, outbound mode and connection method
-- [x] Global shortcuts, start at login, floating speed window
-- [x] English, Russian and Chinese
+- Modern and simple design
+- TUN mode and system proxy
+- Subscription details: traffic and days left, update interval, support link (Remnawave and similar panels)
+- Proxy groups with latency tests, rules, live connections, logs
+- TUN, DNS and sniffer settings, plus a profile editor with validation
+- Profile import from `clash://` links
+- Stable and alpha mihomo cores
+- Menu bar and tray menu, global shortcuts, floating speed window
+- 13 color palettes, light and dark
+- English, Russian, Chinese
 
 ## Download
 
