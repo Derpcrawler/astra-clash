@@ -1,9 +1,10 @@
 {
   "name": "astra-clash",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "Desktop client for the mihomo proxy core",
   "main": "./out/main/index.js",
   "author": "Astra Clash",
+  "license": "GPL-3.0-only",
   "homepage": "https://github.com/Derpcrawler/astra-clash",
   "scripts": {
     "format": "prettier --write .",

@@ -1,17 +1,18 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 // Astra Clash: afterPack check of what went into app.asar. Fails the build when the archive holds
-// anything outside the allowed top-level entries, or when a file in it matches one of the private
-// markers listed in internal/package-markers.txt (one regular expression per line). That list stays
-// in the working repo; without it only the top-level check runs. Runs for every platform before
-// signing.
+// anything outside the allowed top-level entries. When ASTRA_PACKAGE_MARKERS names a file of
+// regular expressions (one per line), it also fails when a file of the app's own code matches one
+// of them. Runs for every platform before signing.
 const fs = require('fs')
 const path = require('path')
 
 const ALLOWED_TOP = new Set(['out', 'resources', 'node_modules', 'package.json', 'LICENSE'])
 
 function loadMarkers() {
-  const file = path.join(__dirname, '..', 'internal', 'package-markers.txt')
-  if (!fs.existsSync(file)) return []
+  const name = process.env.ASTRA_PACKAGE_MARKERS
+  if (!name) return []
+  const file = path.resolve(name)
+  if (!fs.existsSync(file)) throw new Error(`ASTRA_PACKAGE_MARKERS: ${file} does not exist`)
   return fs
     .readFileSync(file, 'utf8')
     .split(/\r?\n/)
@@ -58,9 +59,10 @@ function check(archive, asar, markers = loadMarkers()) {
 exports.check = check
 exports.default = async function (context) {
   const archive = asarPath(context)
-  const problems = check(archive, loadAsar())
+  const markers = loadMarkers()
+  const problems = check(archive, loadAsar(), markers)
   if (problems.length) {
     throw new Error(`app.asar holds files that must not ship:\n  ${problems.join('\n  ')}`)
   }
-  console.log(`  • app.asar contents checked (${path.basename(context.appOutDir)})`)
+  console.log(`  • app.asar contents checked (${path.basename(context.appOutDir)}, ${markers.length} markers)`)
 }

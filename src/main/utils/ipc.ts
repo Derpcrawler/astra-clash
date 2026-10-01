@@ -105,9 +105,12 @@ import {
   resolveThemes,
   writeTheme
 } from '../resolve/theme'
-import { declineElevation, ELEVATION_DECLINED_ARG } from './elevation'
+import { declineElevation } from './elevation'
+import { elevatedArgs, elevatedStartScript } from '../astra/admin-relaunch'
 import { safeSend } from './safeSend'
-import { logDir } from './dirs'
+import { appendFile } from 'fs/promises'
+import { promisify } from 'util'
+import { logDir, logPath } from './dirs'
 import path from 'path'
 import v8 from 'v8'
 import { getIconDataURL, getImageDataURL } from './icon'
@@ -341,28 +344,38 @@ export function registerIpcMainHandlers(): void {
     })()
   )
   ipcMain.handle('restartAsAdmin', async () => {
-    if (process.platform !== 'win32') return
-    const { spawn } = await import('child_process')
-    const quote = (value: string): string => `'${value.replace(/'/g, "''")}'`
-    const exePath = quote(process.execPath)
-    const args = process.argv.slice(1).filter((arg) => arg !== ELEVATION_DECLINED_ARG)
-    const argList = args.length > 0 ? ` -ArgumentList ${args.map(quote).join(',')}` : ''
-    // Relaunching only after this instance is gone keeps the elevated one from losing the
-    // single-instance lock to it. If the UAC prompt is dismissed (users without admin rights
-    // get a credential prompt they cannot answer), come back unelevated instead of vanishing.
-    const script = [
-      `Wait-Process -Id ${process.pid} -Timeout 30 -ErrorAction SilentlyContinue`,
-      `try { Start-Process -FilePath ${exePath}${argList} -Verb RunAs -ErrorAction Stop }`,
-      `catch { Start-Process -FilePath ${exePath} -ArgumentList ${quote(ELEVATION_DECLINED_ARG)} }`
-    ].join('; ')
-    // The attempt itself clears a previous refusal; a dismissed prompt records it again.
+    if (process.platform !== 'win32') return false
+    // Astra Clash: ask for the elevated start while this window is in front, and quit only after it
+    // succeeded (astra/admin-relaunch.ts). Upstream quit first and asked from a hidden background
+    // process; on the owner's PC that left nothing running.
+    const log = (line: string): Promise<void> =>
+      appendFile(logPath(), `[Elevation]: ${line}\n`).catch(() => {})
+    const { execFile } = await import('child_process')
+    const args = elevatedArgs(process.pid)
+    const script = elevatedStartScript(process.execPath, args)
+    await log('asking for the elevated start')
+    try {
+      await promisify(execFile)(
+        'powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+        { windowsHide: true, timeout: 120000 }
+      )
+    } catch (error) {
+      // A cancelled prompt counts as declining: system proxy mode, no question on every launch.
+      await log(`elevated start failed or was cancelled: ${error}`)
+      await declineElevation()
+      setNeedsFirstRunAdmin(false)
+      safeSend(mainWindow, 'appConfigUpdated')
+      return false
+    }
+    await log('elevated copy started, quitting this one')
     await patchAppConfig({ elevationDeclined: false }).catch(() => {})
-    spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true
-    }).unref()
     setNotQuitDialog()
+    // The quit below ends with an explicit exit within about 4.5 s (astra/shutdown-sequence.ts),
+    // including a forced kill of a core that does not stop. This is only a last resort in case the
+    // quit never starts; the elevated copy waits up to 15 s for this process.
+    setTimeout(() => app.exit(), 8000)
     app.quit()
+    return true
   })
 }

@@ -19,13 +19,19 @@ class FakeCore extends EventEmitter {
   killed = false
   kill(signal = 'SIGTERM'): boolean {
     this.killed = true
-    setImmediate(() => {
+    if (this.signalCode !== null || this.exiting) return true
+    this.exiting = true
+    const exit = (): void => {
       this.signalCode = signal
       this.emit('exit', null, signal)
       this.emit('close', null, signal)
-    })
+    }
+    // A real core takes a moment to exit after a signal.
+    if (s.exitDelayMs > 0) setTimeout(exit, s.exitDelayMs)
+    else setImmediate(exit)
     return true
   }
+  exiting = false
   unref(): void {
     // nothing to detach in tests
   }
@@ -41,13 +47,38 @@ const s = vi.hoisted(() => ({
   holdPuts: false,
   heldPuts: [] as { resolve: () => void; reject: (e: Error) => void }[],
   apiUp: true,
-  runtime: {} as Record<string, unknown>
+  runtime: {} as Record<string, unknown>,
+  appConfig: {} as Record<string, unknown>,
+  // Holds the DNS restore at its first system call (route) once, until released.
+  dnsHold: null as null | Promise<void>,
+  exitDelayMs: 0
 }))
 
 vi.mock('child_process', async (orig) => {
   const real = await orig<typeof import('child_process')>()
+  const { promisify } = await import('util')
+  const realRun = promisify(real.execFile)
+  const run = async (file: string, args: string[], ...rest: unknown[]): Promise<{ stdout: string; stderr: string }> => {
+    // The DNS restore's system calls never reach the real commands (networksetup would change this
+    // machine's DNS): they fail, after the one held call when a test holds it.
+    if (file === 'route' || file === 'networksetup') {
+      const hold = s.dnsHold
+      s.dnsHold = null
+      if (hold) await hold
+      throw new Error(`${file} is not run in tests`)
+    }
+    return realRun(file, args, ...(rest as [])) as Promise<{ stdout: string; stderr: string }>
+  }
+  const execFile = Object.assign(
+    (file: string, args: string[], ...rest: unknown[]) => {
+      const cb = rest.at(-1) as (e: Error | null, out?: string, err?: string) => void
+      run(file, args).then((r) => cb(null, r.stdout, r.stderr), (e) => cb(e))
+    },
+    { [promisify.custom]: run }
+  )
   return {
     ...real,
+    execFile,
     spawn: () => {
       const core = new FakeCore()
       s.cores.push(core)
@@ -62,7 +93,7 @@ vi.mock('../src/main/index', () => ({
   }
 }))
 vi.mock('../src/main/config', () => ({
-  getAppConfig: async () => ({}),
+  getAppConfig: async () => s.appConfig,
   getControledMihomoConfig: async () => ({ tun: { enable: false } }),
   getProfileConfig: async () => ({ current: 'p1' }),
   patchAppConfig: async () => {},
@@ -318,13 +349,114 @@ describe('overlapping reloads', () => {
   })
 })
 
+describe('stop during a slow DNS restore', () => {
+  it.runIf(process.platform === 'darwin')('sends SIGINT to the core before waiting for the DNS restore', async () => {
+    const start = manager.startCore()
+    const core = await spawned()
+    core.stdout.write(LISTEN + DEFAULT)
+    // The stop below cancels the readiness wait; the app's callers handle that rejection.
+    ;(await start).forEach((ready) => ready.catch(() => {}))
+    const signals: string[] = []
+    const kill = core.kill.bind(core)
+    core.kill = (signal = 'SIGTERM'): boolean => {
+      signals.push(signal)
+      return kill(signal)
+    }
+    let release!: () => void
+    s.dnsHold = new Promise<void>((r) => (release = r))
+    s.appConfig = { originDNS: '192.0.2.1', autoSetDNSMode: 'exec' }
+    try {
+      const stop = manager.stopCore()
+      await sleep(50)
+      expect(signals).toEqual(['SIGINT']) // the DNS restore is still held
+      release()
+      await stop
+    } finally {
+      release?.()
+      s.dnsHold = null
+      s.appConfig = {}
+    }
+  })
+})
+
+describe('overlapping stops and starts', () => {
+  it.runIf(process.platform === 'darwin')(
+    'keeps tracking a core started while an earlier stop restores DNS',
+    async () => {
+      const start = manager.startCore()
+      ;(await spawned()).stdout.write(LISTEN + DEFAULT)
+      ;(await start).forEach((ready) => ready.catch(() => {}))
+      let release!: () => void
+      s.dnsHold = new Promise<void>((r) => (release = r))
+      s.appConfig = { originDNS: '192.0.2.1', autoSetDNSMode: 'exec' }
+      try {
+        const stop = manager.stopCore() // held in the DNS restore
+        await sleep(20)
+        const before = s.cores.length
+        const restart = manager.startCore() // its own DNS restore fails fast
+        for (let i = 0; i < 100 && s.cores.length === before; i++) await sleep(5)
+        ;(s.cores.at(-1) as FakeCore).stdout.write(LISTEN + DEFAULT)
+        ;(await restart).forEach((ready) => ready.catch(() => {}))
+        release()
+        await stop
+        expect(manager.hasCoreProcess()).toBe(true) // the new core is still the one tracked
+      } finally {
+        release?.()
+        s.dnsHold = null
+        s.appConfig = {}
+      }
+    }
+  )
+
+  it('two quick restarts end with one tracked core and no long stall', async () => {
+    const firstNew = s.cores.length
+    const start = manager.startCore()
+    ;(await spawned()).stdout.write(LISTEN + DEFAULT)
+    ;(await start).forEach((ready) => ready.catch(() => {}))
+    s.exitDelayMs = 200
+    const fed = new Set<unknown>(s.cores)
+    let feeding = true
+    const feeder = (async (): Promise<void> => {
+      while (feeding) {
+        for (const core of s.cores) {
+          if (!fed.has(core)) {
+            fed.add(core)
+            ;(core as FakeCore).stdout.write(LISTEN + DEFAULT)
+          }
+        }
+        await sleep(5)
+      }
+    })()
+    try {
+      const started = Date.now()
+      const first = manager.restartCore()
+      await sleep(5)
+      const second = manager.restartCore()
+      await Promise.all([first, second])
+      const elapsed = Date.now() - started
+      await sleep(250)
+      const running = (s.cores.slice(firstNew) as FakeCore[]).filter(
+        (c) => c.signalCode === null && c.exitCode === null
+      )
+      expect(elapsed).toBeLessThan(3000)
+      expect(running.length).toBe(1)
+      expect(manager.hasCoreProcess()).toBe(true)
+    } finally {
+      feeding = false
+      await feeder
+      s.exitDelayMs = 0
+    }
+  })
+})
+
 // Last in this file: an accepted quit is permanent for the rest of the process.
 describe('restart during an accepted quit', () => {
   it('does not start a new core when the quit is accepted while the old one stops', async () => {
     const { beginShutdown } = await import('../src/main/sys/shutdown')
     const start = manager.startCore()
     ;(await spawned()).stdout.write(LISTEN + DEFAULT)
-    await start
+    // restartCore below stops this core and cancels its readiness wait; the app's callers handle it.
+    ;(await start).forEach((ready) => ready.catch(() => {}))
     const before = s.cores.length
     s.errors = []
 

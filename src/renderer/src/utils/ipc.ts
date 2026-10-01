@@ -226,7 +226,10 @@ export async function manualGrantCorePermition(
   )
 }
 
-export async function checkCorePermission(): Promise<{ mihomo: boolean; 'mihomo-alpha': boolean }> {
+export async function checkCorePermission(): Promise<{
+  mihomo: boolean | 'partial'
+  'mihomo-alpha': boolean | 'partial'
+}> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkCorePermission'))
 }
 

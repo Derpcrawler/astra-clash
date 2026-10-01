@@ -741,6 +741,7 @@ export default {
       taskScheduleNote3: '取消注册后可能需要手动提权才能使用某些功能',
       authorized: '已授权',
       unauthorized: '未授权',
+      incomplete: '不完整',
       revokeAuthorization: '撤销授权',
       authorizeCore: '授权内核',
       grantNote1: '授权后内核将获得必要的系统权限',

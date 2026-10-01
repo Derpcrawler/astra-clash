@@ -2,6 +2,7 @@ import axios, { AxiosInstance } from 'axios'
 import { getAppConfig, getControledMihomoConfig } from '../config'
 import { mainWindow } from '..'
 import WebSocket from 'ws'
+import { connect } from 'net'
 import { tray } from '../resolve/tray'
 import { calcTraffic } from '../utils/calc'
 import { getRuntimeConfig } from './factory'
@@ -332,6 +333,27 @@ export const startMihomoTraffic = async (): Promise<void> => {
   await mihomoTraffic()
 }
 
+// Astra Clash: one of the core's live streams. On Linux the socket folder can have any name
+// (astra/private-dir.ts), and ws reads "ws+unix:<path>" as a URL, so a space or a non-ASCII
+// character in the path is percent-encoded and the stream connects to a different path than the
+// API client. There the stream connects to the checked path itself. macOS and Windows keep their
+// fixed addresses. When no socket folder qualifies, no stream starts (the core cannot run either);
+// the retry handlers call this without a catch, so it must not throw.
+function coreStream(route: string): WebSocket | null {
+  let socketPath: string
+  try {
+    socketPath = mihomoIpcPath()
+  } catch {
+    return null
+  }
+  if (process.platform === 'linux') {
+    return new WebSocket(`ws://localhost${route}`, {
+      createConnection: (() => connect(socketPath)) as unknown as WebSocket.ClientOptions['createConnection']
+    })
+  }
+  return new WebSocket(`ws+unix:${socketPath}:${route}`)
+}
+
 export const stopMihomoTraffic = (): void => {
   if (mihomoTrafficWs) {
     mihomoTrafficWs.removeAllListeners()
@@ -343,7 +365,9 @@ export const stopMihomoTraffic = (): void => {
 }
 
 const mihomoTraffic = async (): Promise<void> => {
-  mihomoTrafficWs = new WebSocket(`ws+unix:${mihomoIpcPath()}:/traffic`)
+  const trafficWs = coreStream('/traffic')
+  if (!trafficWs) return
+  mihomoTrafficWs = trafficWs
 
   mihomoTrafficWs.onmessage = async (e): Promise<void> => {
     const data = e.data as string
@@ -395,7 +419,9 @@ export const stopMihomoMemory = (): void => {
 }
 
 const mihomoMemory = async (): Promise<void> => {
-  mihomoMemoryWs = new WebSocket(`ws+unix:${mihomoIpcPath()}:/memory`)
+  const memoryWs = coreStream('/memory')
+  if (!memoryWs) return
+  mihomoMemoryWs = memoryWs
 
   mihomoMemoryWs.onmessage = (e): void => {
     const data = e.data as string
@@ -448,7 +474,9 @@ export const applyLogLevel = async (level: LogLevel): Promise<void> => {
 }
 
 const mihomoLogs = (): void => {
-  mihomoLogsWs = new WebSocket(`ws+unix:${mihomoIpcPath()}:/logs?level=${mihomoLogsLevel}`)
+  const logsWs = coreStream(`/logs?level=${mihomoLogsLevel}`)
+  if (!logsWs) return
+  mihomoLogsWs = logsWs
 
   mihomoLogsWs.onmessage = (e): void => {
     const data = e.data as string
@@ -501,9 +529,9 @@ export const restartMihomoConnections = async (): Promise<void> => {
 
 const mihomoConnections = async (): Promise<void> => {
   const { connectionInterval = 500 } = await getAppConfig()
-  mihomoConnectionsWs = new WebSocket(
-    `ws+unix:${mihomoIpcPath()}:/connections?interval=${connectionInterval}`
-  )
+  const connectionsWs = coreStream(`/connections?interval=${connectionInterval}`)
+  if (!connectionsWs) return
+  mihomoConnectionsWs = connectionsWs
 
   mihomoConnectionsWs.onmessage = (e): void => {
     const data = e.data as string

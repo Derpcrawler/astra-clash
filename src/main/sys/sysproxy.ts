@@ -6,6 +6,7 @@ import { servicePath } from '../utils/dirs'
 import { net } from 'electron'
 import { disableProxy, setPac, setProxy } from '../service/api'
 import { t } from '../utils/i18n'
+import { isShuttingDown } from './shutdown'
 
 let defaultBypass: string[]
 let triggerSysProxyTimer: NodeJS.Timeout | null = null
@@ -16,6 +17,10 @@ let triggerSysProxyRequest = 0
 // wrong order. Each call also cancels a pending offline retry, so an old "enable" retry cannot turn
 // the proxy back on after the user disconnected. Taken from Sparkle 6831f93 and 5af4bff.
 export function triggerSysProxy(enable: boolean, onlyActiveDevice: boolean): Promise<void> {
+  // Astra Clash: once a quit is accepted, the proxy only goes off. An enable from the tray, a
+  // shortcut or a start still in progress would run after the shutdown's disable and leave the
+  // system pointing at the closed port.
+  if (enable && isShuttingDown()) return Promise.resolve()
   const request = ++triggerSysProxyRequest
   if (triggerSysProxyTimer) {
     clearTimeout(triggerSysProxyTimer)
@@ -44,12 +49,14 @@ async function applySysProxy(
   onlyActiveDevice: boolean,
   request: number
 ): Promise<void> {
+  // Astra Clash: turning the proxy off needs no network, so it never waits for one; a quit while
+  // offline would otherwise exit before the retry and leave the system pointing at a closed port.
+  if (!enable) {
+    await disableSysProxy(onlyActiveDevice)
+    return
+  }
   if (net.isOnline()) {
-    if (enable) {
-      await setSysProxy(onlyActiveDevice)
-    } else {
-      await disableSysProxy(onlyActiveDevice)
-    }
+    await setSysProxy(onlyActiveDevice)
   } else {
     // A newer call is already queued; it decides the final state.
     if (request !== triggerSysProxyRequest) return

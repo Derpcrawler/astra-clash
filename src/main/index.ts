@@ -1,5 +1,4 @@
 import { createQuitFlow } from './sys/quit-flow'
-import { beginShutdown } from './sys/shutdown'
 import { FORK } from './fork'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { registerIpcMainHandlers } from './utils/ipc'
@@ -16,7 +15,7 @@ import {
   shell
 } from 'electron'
 import { addProfileItem, getAppConfig, patchControledMihomoConfig } from './config'
-import { quitWithoutCore, startCore, stopCore } from './core/manager'
+import { forceKillCore, quitWithoutCore, startCore, stopCore } from './core/manager'
 import { triggerSysProxy } from './sys/sysproxy'
 import icon from '../../resources/icon.png?asset'
 import { createTray } from './resolve/tray'
@@ -27,8 +26,11 @@ import { initShortcut } from './resolve/shortcut'
 import { execSync, spawn } from 'child_process'
 import { createElevateTaskSync, ELEVATE_TASK } from './sys/misc'
 import { initProfileUpdater } from './core/profileUpdater'
-import { existsSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, writeFileSync } from 'fs'
 import { exePath, logPath, taskDir } from './utils/dirs'
+import { afterPidFromArgv, waitForPidExit } from './astra/admin-relaunch'
+import { hasTrayHost } from './astra/tray-host'
+import { shutdownAndExit } from './astra/shutdown-sequence'
 import { writeFile } from 'fs/promises'
 import { showFloatingWindow } from './resolve/floatingWindow'
 import { getAppConfigSync } from './config/app'
@@ -131,6 +133,19 @@ if (process.platform === 'win32' && is.dev) {
   patchControledMihomoConfig({ tun: { enable: false } })
 }
 
+// Astra Clash: a copy started by "Restart as administrator" waits for the copy that started it to
+// exit, so it gets the single-instance lock (astra/admin-relaunch.ts).
+const afterPid = afterPidFromArgv(process.argv)
+if (afterPid !== null && !waitForPidExit(afterPid, 15000)) {
+  try {
+    writeFileSync(logPath(), `[Elevation]: previous copy (pid ${afterPid}) still running after 15 s\n`, {
+      flag: 'a'
+    })
+  } catch {
+    // the log folder may not exist yet
+  }
+}
+
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
@@ -197,6 +212,20 @@ app.on('open-url', async (_event, url) => {
 
 // Astra Clash: the before-quit decision lives in sys/quit-flow.ts; an accepted quit sets the shared
 // shutdown state (sys/shutdown.ts) that wake recovery checks.
+const shutdownSteps = {
+  disableSystemProxy: () => triggerSysProxy(false, false),
+  stopCore: () => stopCore(),
+  killCore: () => forceKillCore(),
+  exit: () => app.exit(),
+  log: (line: string) => {
+    try {
+      appendFileSync(logPath(), line)
+    } catch {
+      // logging must not stop the exit
+    }
+  }
+}
+
 const quitFlow = createQuitFlow({
   confirm: () => showQuitConfirmDialog(),
   shutdown: async () => {
@@ -204,9 +233,9 @@ const quitFlow = createQuitFlow({
       clearTimeout(quitTimeout)
       quitTimeout = null
     }
-    triggerSysProxy(false, false)
-    await stopCore()
-    app.exit()
+    // Astra Clash: wait for the system proxy to be off and the core stopped, then exit, also when
+    // either fails or hangs (astra/shutdown-sequence.ts).
+    await shutdownAndExit(shutdownSteps)
   }
 })
 
@@ -261,14 +290,9 @@ app.on('before-quit', (e) => {
 })
 
 powerMonitor.on('shutdown', async () => {
-  beginShutdown()
-  if (quitTimeout) {
-    clearTimeout(quitTimeout)
-    quitTimeout = null
-  }
-  triggerSysProxy(false, false)
-  await stopCore()
-  app.exit()
+  // Astra Clash: the same single shutdown as Quit (sys/quit-flow.ts), so a quit already under way
+  // is joined rather than run twice.
+  await quitFlow.shutdownNow()
 })
 
 // This method will be called when Electron has finished
@@ -484,7 +508,7 @@ export async function createWindow(appConfig?: AppConfig): Promise<void> {
   })
   try {
     const config = appConfig ?? (await getAppConfig())
-    const { useWindowFrame = false } = config
+    const { useWindowFrame = process.platform === 'linux' } = config
 
     const [mainWindowState] = await Promise.all([
       Promise.resolve(
@@ -615,6 +639,12 @@ export async function createWindow(appConfig?: AppConfig): Promise<void> {
 
     mainWindow.on('close', async (event) => {
       event.preventDefault()
+      // Astra Clash: without a tray on Linux, closing the window quits (after the usual
+      // confirmation) instead of hiding the app with no way back to Quit (astra/tray-host.ts).
+      if (process.platform === 'linux' && !(await hasTrayHost())) {
+        app.quit()
+        return
+      }
       mainWindow?.hide()
       if (windowShown) {
         await scheduleLightweightMode()
