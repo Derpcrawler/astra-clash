@@ -326,12 +326,12 @@ const resolveSparkleService = () => {
   const ext = platform === 'win32' ? '.exe' : ''
 
   // Astra Clash: pinned by hash because the pre-release tag can change and the app runs this as root.
-  // All three come from the upload of 2026-09-27, checked 2026-09-29 (Linux 2026-10-01). Only the
-  // platforms the fork builds for are pinned.
+  // All three come from the upload of 2026-10-03 (commit dbe85a6, Go 1.26.8), checked 2026-10-08.
+  // Only the platforms the fork builds for are pinned.
   const pinned = {
-    'darwin-arm64': 'dc251f5d6cdd88048809b59c641c663eb460568233fecb39b102b4b7fea7d8e7',
-    'win32-x64': '3cda57e54e0ccb980c2031f2fb3bfd294d1037d3188e33cf364a00672393f08b',
-    'linux-x64': 'bb3a280a1047907c2420a5938e07f9c1f18138355c52ee51a66aceb7f927a73d'
+    'darwin-arm64': '55263fa08ef9831d44a5e0b41dd2cb5b480e6b6bf9f678f87757b96f3144a5ee',
+    'win32-x64': 'df7314bb79fdf4485a6adffe25b63eb7eebd5ddd3792ffcb2f6f31a616c9a9ac',
+    'linux-x64': 'd87e8414f097a24b0b14f6d426ddb00a0646dd7f01bba9574659f6a0b529b691'
   }
   if (!pinned[`${platform}-${arch}`]) {
     throw new Error(`sparkle-service: no pinned SHA-256 for ${platform}-${arch}; add one in scripts/prepare.mjs`)
