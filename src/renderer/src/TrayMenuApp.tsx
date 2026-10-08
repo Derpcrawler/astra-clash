@@ -61,7 +61,7 @@ const TrayMenuApp: React.FC = () => {
     try {
       await mihomoChangeProxy(groupName, proxyName)
       if (autoCloseConnection) {
-        await mihomoCloseAllConnections()
+        await mihomoCloseAllConnections(groupName)
       }
       mutate()
     } catch (e) {

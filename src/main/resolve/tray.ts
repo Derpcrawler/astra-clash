@@ -258,7 +258,7 @@ export const buildContextMenu = async (): Promise<Menu> => {
                 click: async (): Promise<void> => {
                   await mihomoChangeProxy(group.name, proxy.name)
                   if (autoCloseConnection) {
-                    await mihomoCloseAllConnections()
+                    await mihomoCloseAllConnections(group.name)
                   }
                 }
               }
