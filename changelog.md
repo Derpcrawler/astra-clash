@@ -1,3 +1,14 @@
+## 1.0.6
+
+### Improved
+
+- Electron 44.7.0 with the latest security fixes.
+- Updated helper service.
+
+### Fixed
+
+- Choosing a server in the menu bar closes only the connections of its group.
+
 ## 1.0.5
 
 ### New
