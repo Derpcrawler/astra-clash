@@ -55,7 +55,7 @@ Found a bug? [Open an issue](https://github.com/Derpcrawler/astra-clash/issues).
 
 ## Build from source
 
-You need Node.js 20 or later, pnpm 10 and Git. Building for Windows also needs Go 1.21 or later.
+You need Node.js 22.12 or later, pnpm 10 and Git. Building for Windows also needs Go 1.21 or later.
 
 ```bash
 git clone https://github.com/Derpcrawler/astra-clash.git
