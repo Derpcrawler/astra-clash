@@ -1,25 +1,23 @@
 import { create } from 'zustand'
 
-export interface UpdaterStatus {
-  downloading: boolean
-  progress: number
-  error?: string
-}
+// Noctur: the state of an update in progress, sent by the main process as 'update-status'
+// (resolve/autoUpdater.ts) and shown by the update line on Home (noctur/update-line.tsx).
+export type UpdaterStatus =
+  | { phase: 'idle' }
+  | { phase: 'downloading'; progress: number }
+  | { phase: 'confirm' }
+  | { phase: 'installing' }
+  | { phase: 'restarting' }
+  | { phase: 'error'; error: 'download' | 'checksum' | 'cancelled' | 'install' }
 
-interface UpdaterStore extends UpdaterStatus {
+interface UpdaterStore {
+  status: UpdaterStatus
   setStatus: (status: UpdaterStatus) => void
-  reset: () => void
-}
-
-const initialStatus: UpdaterStatus = {
-  downloading: false,
-  progress: 0
 }
 
 export const useUpdaterStore = create<UpdaterStore>((set) => ({
-  ...initialStatus,
-  setStatus: (status): void => set(status),
-  reset: (): void => set(initialStatus)
+  status: { phase: 'idle' },
+  setStatus: (status): void => set({ status })
 }))
 
 let attached = false
@@ -32,16 +30,10 @@ export const attachUpdaterStore = (): (() => void) => {
     }
   }
   attached = true
-
   ipcListener = (_event, payload): void => {
-    useUpdaterStore.setState({
-      downloading: payload.downloading,
-      progress: payload.progress,
-      error: payload.error
-    })
+    useUpdaterStore.setState({ status: payload })
   }
   window.electron.ipcRenderer.on('update-status', ipcListener)
-
   return (): void => {
     if (!attached) return
     attached = false

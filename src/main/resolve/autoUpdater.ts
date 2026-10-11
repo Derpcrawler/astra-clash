@@ -1,200 +1,172 @@
-import axios, { AxiosRequestConfig, CancelTokenSource } from 'axios'
-import { parseYaml } from '../utils/yaml'
-import { app, shell } from 'electron'
-import { getRuntimeConfig } from '../core/factory'
-import { dataDir, exeDir, exePath, isPortable, resourcesFilesDir } from '../utils/dirs'
-import { copyFile, rm, writeFile, readFile } from 'fs/promises'
+// Noctur: the app's side of self-update (checking, progress, cancelling, quitting to install). The
+// release logic lives in noctur/update.ts; Koala Clash's version of this file is replaced.
+import { app } from 'electron'
+import { execFile, spawn } from 'child_process'
 import path from 'path'
-import { existsSync } from 'fs'
-import { exec, spawn } from 'child_process'
-import { promisify } from 'util'
-import { createHash } from 'crypto'
+import { existsSync, rmSync } from 'fs'
+import { getRuntimeConfig } from '../core/factory'
+import { dataDir } from '../utils/dirs'
 import { setNotQuitDialog, mainWindow } from '..'
-import { disableSysProxy } from '../sys/sysproxy'
-import { t } from '../utils/i18n'
-import { FORK } from '../fork'
+import {
+  appleScriptFor,
+  ChecksumError,
+  downloadVerified,
+  fetchLatest,
+  MAC_CHECKSUM_EXIT,
+  macInstallScript,
+  ProxyConfig,
+  UpdateInfo,
+  winHelperScript
+} from '../noctur/update'
 
-let downloadCancelToken: CancelTokenSource | null = null
+/** What the window shows for an update in progress. */
+export type UpdatePhase =
+  | { phase: 'idle' }
+  | { phase: 'downloading'; progress: number }
+  // Waiting for the system prompt (password on macOS), installing (macOS, after the password), and
+  // quitting to restart into the new version.
+  | { phase: 'confirm' }
+  | { phase: 'installing' }
+  | { phase: 'restarting' }
+  | { phase: 'error'; error: 'download' | 'checksum' | 'cancelled' | 'install' }
+
+let latest: UpdateInfo | undefined
+let abort: AbortController | null = null
+
+function send(status: UpdatePhase): void {
+  mainWindow?.webContents.send('update-status', status)
+  if (status.phase === 'downloading') mainWindow?.setProgressBar(status.progress / 100)
+  else mainWindow?.setProgressBar(-1)
+}
+
+async function proxy(): Promise<ProxyConfig> {
+  try {
+    const { 'mixed-port': port = 0 } = (await getRuntimeConfig()) ?? {}
+    return port ? { protocol: 'http', host: '127.0.0.1', port } : false
+  } catch {
+    return false
+  }
+}
 
 export async function checkUpdate(): Promise<AppVersion | undefined> {
-  if (!FORK.selfUpdate) return undefined
-  const { 'mixed-port': mixedPort = 0 } = (await getRuntimeConfig()) ?? {}
-  const url = 'https://github.com/coolcoala/koala-clash/releases/latest/download/latest.yml'
-  const res = await axios.get(url, {
-    headers: { 'Content-Type': 'application/octet-stream' },
-    ...(mixedPort != 0 && {
-      proxy: {
-        protocol: 'http',
-        host: '127.0.0.1',
-        port: mixedPort
-      }
-    }),
-    responseType: 'text'
-  })
-  const latest = parseYaml<AppVersion>(res.data)
-  const currentVersion = app.getVersion()
-  if (latest.version !== currentVersion) {
-    return latest
-  } else {
-    return undefined
+  latest = await fetchLatest(app.getVersion(), await proxy())
+  if (!latest) return undefined
+  return {
+    version: latest.version,
+    changelog: latest.changelog,
+    page: latest.page,
+    installable: !!latest.file
   }
+}
+
+function quitForUpdate(relaunch: boolean): void {
+  send({ phase: 'restarting' })
+  setNotQuitDialog()
+  if (relaunch) app.relaunch()
+  app.quit()
+}
+
+function runAppleScript(script: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile('/usr/bin/osascript', ['-e', script], (err, _out, stderr) => {
+      if (!err) return resolve()
+      const code = (err as { code?: number }).code
+      if (/-128|User canceled/i.test(stderr))
+        reject(Object.assign(new Error('cancelled'), { kind: 'cancelled' }))
+      // A failed `do shell script` ends its message with the script's exit code: "... (12)".
+      else if (
+        code === MAC_CHECKSUM_EXIT ||
+        new RegExp(`\\(${MAC_CHECKSUM_EXIT}\\)\\s*$`).test(stderr)
+      )
+        reject(new ChecksumError(stderr))
+      else reject(Object.assign(new Error(stderr || String(err)), { kind: 'install' }))
+    })
+  })
 }
 
 export async function downloadAndInstallUpdate(version: string): Promise<void> {
-  if (!FORK.selfUpdate) throw new Error(t('error.autoUpdateNotSupported'))
-  const { 'mixed-port': mixedPort = 0 } = (await getRuntimeConfig()) ?? {}
-  const releaseTag = version
-  const baseUrl = `https://github.com/coolcoala/koala-clash/releases/download/${releaseTag}/`
-  const fileMap = {
-    'win32-x64': `Koala.Clash_x64-setup.exe`,
-    'win32-arm64': `Koala.Clash_arm64-setup.exe`,
-    'darwin-x64': `Koala.Clash_x64.pkg`,
-    'darwin-arm64': `Koala.Clash_arm64.pkg`
-  }
-  let file = fileMap[`${process.platform}-${process.arch}`]
-  if (isPortable()) {
-    file = file.replace('-setup.exe', '-portable.7z')
-  }
-  if (!file) {
-    throw new Error(t('error.autoUpdateNotSupported'))
-  }
-  downloadCancelToken = axios.CancelToken.source()
+  if (!latest || latest.version !== version) await checkUpdate()
+  const file = latest?.version === version ? latest.file : undefined
+  if (!file) throw new Error('no installer for this platform')
 
-  const apiUrl = `https://api.github.com/repos/coolcoala/koala-clash/releases/tags/${releaseTag}`
-  const apiRequestConfig: AxiosRequestConfig = {
-    headers: { Accept: 'application/vnd.github.v3+json' },
-    ...(mixedPort != 0 && {
-      proxy: {
-        protocol: 'http',
-        host: '127.0.0.1',
-        port: mixedPort
-      }
-    }),
-    cancelToken: downloadCancelToken.token
-  }
-
+  const dest = path.join(dataDir(), 'updates', file.name)
+  abort = new AbortController()
   try {
-    mainWindow?.webContents.send('update-status', {
-      downloading: true,
-      progress: 0
-    })
-    mainWindow?.setProgressBar(0)
-
-    const releaseRes = await axios.get(apiUrl, apiRequestConfig)
-    const assets: Array<{ name: string; digest?: string }> = releaseRes.data.assets || []
-    const matchedAsset = assets.find((a) => a.name === file)
-    if (!matchedAsset || !matchedAsset.digest) {
-      throw new Error(`${t('error.sha256NotFound')}: "${file}"`)
-    }
-    const expectedHash = matchedAsset.digest.split(':')[1].toLowerCase()
-
-    if (!existsSync(path.join(dataDir(), file))) {
-      const res = await axios.get(`${baseUrl}${file}`, {
-        responseType: 'arraybuffer',
-        ...(mixedPort != 0 && {
-          proxy: {
-            protocol: 'http',
-            host: '127.0.0.1',
-            port: mixedPort
-          }
-        }),
-        headers: {
-          'Content-Type': 'application/octet-stream'
-        },
-        cancelToken: downloadCancelToken.token,
-        onDownloadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / (progressEvent.total || 1)
-          )
-          mainWindow?.webContents.send('update-status', {
-            downloading: true,
-            progress: percentCompleted
-          })
-          mainWindow?.setProgressBar(percentCompleted / 100)
-        }
-      })
-      await writeFile(path.join(dataDir(), file), res.data)
-    }
-
-    const fileBuffer = await readFile(path.join(dataDir(), file))
-    const hashSum = createHash('sha256')
-    hashSum.update(fileBuffer)
-    const localHash = hashSum.digest('hex').toLowerCase()
-    if (localHash !== expectedHash) {
-      await rm(path.join(dataDir(), file), { force: true })
-      throw new Error(
-        `${t('error.sha256VerificationFailed')}：${t('error.localHash')} ${localHash} ${t('error.expectedHash')} ${expectedHash} ${t('error.mismatch')}`
-      )
-    }
-
-    mainWindow?.webContents.send('update-status', {
-      downloading: false,
-      progress: 100
-    })
-    mainWindow?.setProgressBar(-1)
-
-    disableSysProxy(false)
-    if (file.endsWith('.exe')) {
-      spawn(path.join(dataDir(), file), ['/S', '--force-run'], {
-        detached: true,
-        stdio: 'ignore'
-      }).unref()
-    }
-    if (file.endsWith('.7z')) {
-      await copyFile(path.join(resourcesFilesDir(), '7za.exe'), path.join(dataDir(), '7za.exe'))
-      spawn(
-        'cmd',
-        [
-          '/C',
-          `"timeout /t 2 /nobreak >nul && "${path.join(dataDir(), '7za.exe')}" x -o"${exeDir()}" -y "${path.join(dataDir(), file)}" & start "" "${exePath()}""`
-        ],
-        {
-          shell: true,
-          detached: true
-        }
-      ).unref()
-      setNotQuitDialog()
-      app.quit()
-    }
-    if (file.endsWith('.pkg')) {
-      try {
-        const execPromise = promisify(exec)
-        const shell = `installer -pkg ${path.join(dataDir(), file).replace(' ', '\\\\ ')} -target /`
-        const command = `do shell script "${shell}" with administrator privileges`
-        await execPromise(`osascript -e '${command}'`)
-        app.relaunch()
-        setNotQuitDialog()
-        app.quit()
-      } catch {
-        shell.openPath(path.join(dataDir(), file))
-      }
-    }
+    send({ phase: 'downloading', progress: 0 })
+    await downloadVerified(
+      file,
+      dest,
+      await proxy(),
+      (progress) => send({ phase: 'downloading', progress }),
+      abort.signal
+    )
   } catch (e) {
-    await rm(path.join(dataDir(), file), { force: true })
-    mainWindow?.setProgressBar(-1)
-    if (axios.isCancel(e)) {
-      mainWindow?.webContents.send('update-status', {
-        downloading: false,
-        progress: 0,
-        error: t('error.downloadCancelled')
-      })
-      return
-    } else {
-      mainWindow?.webContents.send('update-status', {
-        downloading: false,
-        progress: 0,
-        error: e instanceof Error ? e.message : t('error.downloadFailed')
-      })
-    }
+    const cancelled = abort.signal.aborted
+    send({
+      phase: cancelled ? 'idle' : 'error',
+      ...(cancelled ? {} : { error: e instanceof ChecksumError ? 'checksum' : 'download' })
+    } as UpdatePhase)
+    if (cancelled) return
     throw e
   } finally {
-    downloadCancelToken = null
+    abort = null
   }
+
+  send({ phase: 'confirm' })
+  try {
+    if (process.platform === 'darwin') {
+      // The root script creates the marker first, once the password is accepted.
+      const marker = path.join(dataDir(), 'updates', '.installing')
+      rmSync(marker, { force: true })
+      const watch = setInterval(() => {
+        if (existsSync(marker)) {
+          clearInterval(watch)
+          send({ phase: 'installing' })
+        }
+      }, 250)
+      try {
+        await runAppleScript(
+          appleScriptFor(macInstallScript({ pkg: dest, sha256: file.sha256, marker }), true)
+        )
+      } finally {
+        clearInterval(watch)
+        rmSync(marker, { force: true })
+      }
+      rmSync(dest, { force: true })
+    } else if (process.platform === 'win32') {
+      spawn(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          winHelperScript(dest, app.getPath('exe'), process.pid)
+        ],
+        { detached: true, stdio: 'ignore', windowsHide: true }
+      ).unref()
+    } else {
+      throw new Error('no installer for this platform')
+    }
+  } catch (e) {
+    const kind =
+      e instanceof ChecksumError
+        ? 'checksum'
+        : (e as { kind?: string }).kind === 'cancelled'
+          ? 'cancelled'
+          : 'install'
+    send({ phase: 'error', error: kind } as UpdatePhase)
+    // Declining the password prompt is not a failure: the line offers Update again.
+    if (kind === 'cancelled') return
+    throw e
+  }
+  // macOS: installed, restart into it. Windows: the helper starts the installer once the app is
+  // gone, and the installer opens the new version.
+  quitForUpdate(process.platform === 'darwin')
 }
 
 export async function cancelUpdate(): Promise<void> {
-  if (downloadCancelToken) {
-    downloadCancelToken.cancel(t('error.userCancelledDownload'))
-    downloadCancelToken = null
-  }
+  abort?.abort()
 }
