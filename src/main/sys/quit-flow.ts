@@ -1,6 +1,6 @@
 import { beginShutdown } from './shutdown'
 
-// Astra Clash: the before-quit decision, moved out of index.ts so it can be tested. Behavior is
+// Noctur: the before-quit decision, moved out of index.ts so it can be tested. Behavior is
 // upstream's: ask for confirmation unless quitting was requested without a dialog, quit at once on
 // a second attempt within 500 ms, and do nothing when the user declines. An accepted quit marks the
 // shared shutdown state before shutdown starts.

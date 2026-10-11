@@ -2,10 +2,10 @@ export const defaultConfig: AppConfig = {
   core: 'mihomo',
   silentStart: false,
   appTheme: 'system',
-  palette: 'm45',
+  palette: 'noctur',
   starField: true,
   connectJump: true,
-  // Astra Clash: Linux has no native buttons over a frameless window, so it uses the system title bar.
+  // Noctur: Linux has no native buttons over a frameless window, so it uses the system title bar.
   useWindowFrame: process.platform === 'linux',
   proxyInTray: true,
   useCustomTrayMenu: false,

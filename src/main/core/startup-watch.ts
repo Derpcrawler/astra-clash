@@ -1,4 +1,4 @@
-// Astra Clash: reading the core's startup log. The core reports on stdout when its controller is
+// Noctur: reading the core's startup log. The core reports on stdout when its controller is
 // listening. Output arrives in chunks that can hold several lines or part of one, so lines are
 // split here and every line goes through one reader in order, from the first byte. Lines after
 // the controller line go to onLine (provider tracking, core/provider-tracker.ts), for as long as

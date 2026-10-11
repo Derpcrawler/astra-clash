@@ -107,7 +107,7 @@ const AdvancedSettings: React.FC<AdvancedSettingsProps> = (props) => {
   }
 
   return (
-    <SettingCard title={t('astra.settings.advanced')}>
+    <SettingCard title={t('noctur.settings.advanced')}>
       <SettingItem
         title={t('settings.advanced.autoEnterLightMode')}
         actions={

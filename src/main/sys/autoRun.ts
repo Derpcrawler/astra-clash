@@ -7,7 +7,7 @@ import { existsSync } from 'fs'
 import { promisify } from 'util'
 import path from 'path'
 
-const appName = 'astra-clash'
+const appName = 'noctur'
 
 const taskXml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -96,17 +96,22 @@ export async function enableAutoRun(): Promise<void> {
       '-e',
       `tell application "System Events" to make login item at end with properties {path:"${exePath().split('.app')[0]}.app", hidden:false}`
     ])
+    // Noctur: the login item of Astra Clash (the app's previous name) points to an app that is gone.
+    await execFilePromise('osascript', [
+      '-e',
+      'tell application "System Events" to if exists login item "Astra Clash" then delete login item "Astra Clash"'
+    ]).catch(() => {})
   }
   if (process.platform === 'linux') {
     let desktop = `
 [Desktop Entry]
-Name=astra-clash
+Name=noctur
 Exec=${exePath()} %U
 Terminal=false
 Type=Application
-Icon=astra-clash
-StartupWMClass=astra-clash
-Comment=Astra Clash
+Icon=noctur
+StartupWMClass=noctur
+Comment=Noctur
 Categories=Utility;
 `
 

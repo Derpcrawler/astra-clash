@@ -1,34 +1,41 @@
-import NodePicker from '@renderer/astra/node-picker'
-import { fixedBytes } from '@renderer/astra/format'
-import { jumpFrom } from '@renderer/astra/backdrop'
+import NodePicker from '@renderer/noctur/node-picker'
+import { fixedBytes } from '@renderer/noctur/format'
+import Eclipse, { EclipseState } from '@renderer/noctur/eclipse'
+import { useTheme } from 'next-themes'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from '@renderer/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import BasePage from '@renderer/components/base/base-page'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import { useProfileConfig } from '@renderer/hooks/use-profile-config'
 import { useGroups } from '@renderer/hooks/use-groups'
-import { triggerSysProxy, updateTrayIcon, mihomoHotReloadConfig } from '@renderer/utils/ipc'
+import { updateTrayIcon, changeConnectionMethod, setConnected } from '@renderer/utils/ipc'
 import { useTranslation } from 'react-i18next'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import {
   InfinityIcon,
   WifiOff,
   PlusCircle,
   ChevronRight,
+  ChevronDown,
   Globe,
-  ArrowUp,
-  ArrowDown,
   RefreshCcw,
   CalendarClock,
-  CreditCard,
-  Power
+  Power,
+  CreditCard
 } from 'lucide-react'
 import { SiTelegram } from 'react-icons/si'
 import EditInfoModal from '@renderer/components/profiles/edit-info-modal'
 import { Spinner } from '@renderer/components/ui/spinner'
-import { CharacterMorph } from '@renderer/components/ui/character-morph'
 import { useTrafficStore } from '@renderer/store/traffic-store'
+import UpdateLine from '@renderer/noctur/update-line'
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B'
@@ -79,15 +86,19 @@ ConnectedTimer.displayName = 'ConnectedTimer'
 
 const Home: React.FC = () => {
   const { t } = useTranslation()
-  const { appConfig, patchAppConfig } = useAppConfig()
+  const { appConfig } = useAppConfig()
   const {
     mainSwitchMode = 'tun',
     sysProxy,
     proxyMode = false,
-    onlyActiveDevice = false
+    connectJump = true,
+    look = 'noctur'
   } = appConfig || {}
+  const calm = look === 'calm'
+  const { resolvedTheme } = useTheme()
+  const light = resolvedTheme === 'light'
   const { enable: writeSysProxy = true, mode } = sysProxy || {}
-  const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()
+  const { controledMihomoConfig } = useControledMihomoConfig()
   const { tun } = controledMihomoConfig || {}
   const { 'mixed-port': mixedPort } = controledMihomoConfig || {}
   const sysProxyDisabled = mixedPort == 0
@@ -132,12 +143,6 @@ const Home: React.FC = () => {
     : isSelected
       ? t('pages.home.connected')
       : t('pages.home.disconnected')
-  const statusWidthTexts = [
-    t('pages.home.connecting'),
-    t('pages.home.disconnecting'),
-    t('pages.home.connected'),
-    t('pages.home.disconnected')
-  ]
   const showConnectedTimer = !loading && isSelected
 
   // Current profile & subscription
@@ -215,41 +220,11 @@ const Home: React.FC = () => {
     }
   }, [supportUrl])
 
-  const powerButtonRef = useRef<HTMLButtonElement>(null)
-
   const onValueChange = async (enable: boolean): Promise<void> => {
     setLoading(true)
     setLoadingDirection(enable ? 'connecting' : 'disconnecting')
-    if (enable) jumpFrom(powerButtonRef.current)
     try {
-      if (enable) {
-        if (mainSwitchMode === 'tun') {
-          await patchControledMihomoConfig({ tun: { enable: true }, dns: { enable: true } })
-          await mihomoHotReloadConfig()
-        } else {
-          if (writeSysProxy && mode == 'manual' && sysProxyDisabled) return
-          await patchAppConfig({ proxyMode: true })
-          await mihomoHotReloadConfig()
-          if (writeSysProxy) {
-            await triggerSysProxy(true, onlyActiveDevice)
-          }
-        }
-      } else {
-        const tunWasEnabled = tun?.enable ?? false
-        const proxyModeWasEnabled = proxyMode
-        if (tunWasEnabled) {
-          await patchControledMihomoConfig({ tun: { enable: false } })
-        }
-        if (proxyModeWasEnabled) {
-          if (writeSysProxy) {
-            await triggerSysProxy(false, onlyActiveDevice)
-          }
-          await patchAppConfig({ proxyMode: false })
-        }
-        if (tunWasEnabled || proxyModeWasEnabled) {
-          await mihomoHotReloadConfig()
-        }
-      }
+      await setConnected(enable)
       window.electron.ipcRenderer.send('updateFloatingWindow')
       window.electron.ipcRenderer.send('updateTrayMenu')
       await updateTrayIcon()
@@ -260,9 +235,38 @@ const Home: React.FC = () => {
     }
   }
 
+  // The eclipse: dim while disconnected, pulsing while connecting, the sun up when connected.
+  const eclipseState: EclipseState =
+    loading && loadingDirection === 'connecting'
+      ? 'connecting'
+      : isSelected && !loading
+        ? 'on'
+        : 'off'
+
+  // TUN or System Proxy from the method chip; reconnects through the new method when connected.
+  const changeMethod = async (to: string): Promise<void> => {
+    if (to === mainSwitchMode || (to !== 'tun' && to !== 'sysproxy')) return
+    if (isSelected) {
+      setLoading(true)
+      setLoadingDirection('connecting')
+    }
+    try {
+      await changeConnectionMethod(to)
+      await updateTrayIcon()
+    } catch (e) {
+      toast.error(`${e}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+  // While connected, System Proxy with a manual proxy and no mixed port cannot carry traffic.
+  const proxyUnusable = writeSysProxy && mode == 'manual' && sysProxyDisabled
+
   // "Updated 5 min ago · every 6 h" under the profile name (remote profiles only).
   const updatedFromNow =
-    currentProfile?.type === 'remote' && currentProfile.updated ? dayjs(currentProfile.updated).fromNow() : null
+    currentProfile?.type === 'remote' && currentProfile.updated
+      ? dayjs(currentProfile.updated).fromNow()
+      : null
   const interval = currentProfile?.type === 'remote' ? (currentProfile.interval ?? 0) : 0
   const intervalLabel =
     interval <= 0
@@ -274,14 +278,17 @@ const Home: React.FC = () => {
           : `${interval}${t('profile.minuteShort')}`
 
   const firstNow = firstGroup?.all?.find((p) => p.name === firstGroup.now)
-  const firstDelay = firstNow?.history?.length ? firstNow.history[firstNow.history.length - 1].delay : -1
-  const delayClass = firstDelay <= 0 ? 'bad' : firstDelay < 150 ? 'ok' : firstDelay < 400 ? 'warn' : 'bad'
+  const firstDelay = firstNow?.history?.length
+    ? firstNow.history[firstNow.history.length - 1].delay
+    : -1
+  const delayClass =
+    firstDelay <= 0 ? 'bad' : firstDelay < 150 ? 'ok' : firstDelay < 400 ? 'warn' : 'bad'
 
   return (
     <BasePage compactHeader>
       {!hasProfiles ? (
-        <div className="astra-empty">
-          <div className="astra-empty-icon">
+        <div className="noctur-empty">
+          <div className="noctur-empty-icon">
             <WifiOff className="size-7" />
           </div>
           <h2>{t('pages.profiles.emptyTitle')}</h2>
@@ -289,7 +296,7 @@ const Home: React.FC = () => {
           <button
             onClick={handleAddProfile}
             data-guide="home-add-profile-btn"
-            className="astra-btn primary"
+            className="noctur-btn primary"
           >
             <PlusCircle className="size-4" />
             {t('pages.profiles.addProfile')}
@@ -311,32 +318,32 @@ const Home: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="astra-home">
-          <div className="astra-home-top">
+        <div className="noctur-home">
+          <div className="noctur-home-top">
             {/* Profile card: name, update button and the subscription numbers in one row */}
             {currentProfile && (
-              <div className="astra-card astra-prof">
-                <div data-guide="home-profile-header" className="astra-prof-id">
+              <div className="noctur-card noctur-prof">
+                <div data-guide="home-profile-header" className="noctur-prof-id">
                   {currentProfile.logo ? (
                     <img
                       src={currentProfile.logo}
                       alt=""
-                      className="astra-logo"
+                      className="noctur-logo"
                       onError={(e) => {
                         ;(e.target as HTMLImageElement).style.display = 'none'
                       }}
                     />
                   ) : (
-                    <div className="astra-logo">{currentProfile.name?.[0]?.toUpperCase()}</div>
+                    <div className="noctur-logo">{currentProfile.name?.[0]?.toUpperCase()}</div>
                   )}
                   <div className="min-w-0">
-                    <div className="astra-prof-name">
+                    <div className="noctur-prof-name">
                       <span className="truncate">{currentProfile.name}</span>
                       {currentProfile.type === 'remote' && (
                         <button
                           onClick={handleUpdateProfile}
                           disabled={updating}
-                          className="astra-ib sm"
+                          className="noctur-ib sm"
                           title={t('pages.profiles.updateProfile', 'Update')}
                         >
                           <RefreshCcw className={`size-3.5 ${updating ? 'animate-spin' : ''}`} />
@@ -344,26 +351,32 @@ const Home: React.FC = () => {
                       )}
                     </div>
                     {currentProfile.announce && (
-                      <div data-guide="home-profile-announce" className="astra-prof-note">
+                      <div data-guide="home-profile-announce" className="noctur-prof-note">
                         {currentProfile.announce}
                       </div>
                     )}
                     {(updatedFromNow || intervalLabel || supportLinkInfo) && (
-                      <div className="astra-prof-meta">
+                      <div className="noctur-prof-meta">
                         {updatedFromNow && (
                           <span>
                             {t('profile.updatedAt')} {updatedFromNow}
                           </span>
                         )}
-                        {intervalLabel && <span>{t('astra.profile.every', { interval: intervalLabel })}</span>}
+                        {intervalLabel && (
+                          <span>{t('noctur.profile.every', { interval: intervalLabel })}</span>
+                        )}
                         {supportLinkInfo && (
                           <button
                             data-guide="home-support-link"
                             type="button"
                             onClick={() => open(supportLinkInfo.href)}
-                            className="astra-support"
+                            className="noctur-support"
                           >
-                            {supportLinkInfo.isTelegram ? <SiTelegram className="size-3" /> : <Globe className="size-3" />}
+                            {supportLinkInfo.isTelegram ? (
+                              <SiTelegram className="size-3" />
+                            ) : (
+                              <Globe className="size-3" />
+                            )}
                             {t('pages.profiles.support')}
                           </button>
                         )}
@@ -373,99 +386,212 @@ const Home: React.FC = () => {
                 </div>
                 {subscription && !showExpiryNotice && (
                   <>
-                    <div className="astra-stat">
+                    <div className="noctur-stat">
                       <span>{t('pages.home.trafficRemaining')}</span>
-                      <b>{trafficTotal > 0 ? formatBytes(trafficRemaining) : <InfinityIcon className="size-4.5" />}</b>
+                      <b>
+                        {trafficTotal > 0 ? (
+                          formatBytes(trafficRemaining)
+                        ) : (
+                          <InfinityIcon className="size-4.5" />
+                        )}
+                      </b>
                     </div>
-                    <div className="astra-stat">
+                    <div className="noctur-stat">
                       <span>{t('pages.home.daysRemaining')}</span>
-                      <b>{expireTimestamp > 0 ? daysRemaining : <InfinityIcon className="size-4.5" />}</b>
+                      <b>
+                        {expireTimestamp > 0 ? (
+                          daysRemaining
+                        ) : (
+                          <InfinityIcon className="size-4.5" />
+                        )}
+                      </b>
                     </div>
-                    <div className="astra-stat">
+                    <div className="noctur-stat">
                       <span>{t('pages.home.expires')}</span>
                       <b>{expireDate}</b>
                     </div>
+                    {trafficTotal > 0 && (
+                      <div className="noctur-usage">
+                        <div className="noctur-usage-bar">
+                          <i
+                            style={{
+                              width: `${Math.min(100, (trafficUsed / trafficTotal) * 100)}%`
+                            }}
+                          />
+                        </div>
+                        <div className="noctur-usage-meta">
+                          <span>
+                            {t('noctur.home.used', {
+                              used: formatBytes(trafficUsed),
+                              total: formatBytes(trafficTotal)
+                            })}
+                          </span>
+                          <span>{Math.round((trafficUsed / trafficTotal) * 100)}%</span>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
             )}
             {/* Subscription expiry notice replaces the numbers near the end of the period */}
             {subscription && showExpiryNotice && (
-              <div role="status" className="astra-card astra-expiry">
-                <div className="astra-expiry-icon">
+              <div role="status" className="noctur-card noctur-expiry">
+                <div className="noctur-expiry-icon">
                   <CalendarClock className="size-5" aria-hidden />
                 </div>
                 <div className="min-w-0 grow">
-                  <p className="astra-expiry-title">{expiryTitle}</p>
-                  <p className="astra-expiry-hint">
+                  <p className="noctur-expiry-title">{expiryTitle}</p>
+                  <p className="noctur-expiry-hint">
                     {isExpired
                       ? t('pages.home.subscriptionExpiredHint')
                       : t('pages.home.subscriptionExpiringHint', { date: expireDate })}
                   </p>
                 </div>
                 {renewAction && (
-                  <button type="button" onClick={() => open(renewAction.url)} className="astra-btn primary">
+                  <button
+                    type="button"
+                    onClick={() => open(renewAction.url)}
+                    className="noctur-btn primary"
+                  >
                     <CreditCard className="size-4 shrink-0" aria-hidden />
                     <span className="truncate">{renewAction.label}</span>
                   </button>
                 )}
               </div>
             )}
+            <UpdateLine />
           </div>
 
-          {/* Power button, status under it, then timer and traffic when connected */}
-          <div className="astra-home-center">
-            <button
-              ref={powerButtonRef}
-              disabled={isDisabled}
-              onClick={() => onValueChange(!isSelected)}
-              data-guide="home-power-toggle"
-              aria-label={status}
-              className={`astra-power${isSelected || (loading && loadingDirection === 'connecting') ? ' on' : ''}${loading ? ' busy' : ''}`}
-            >
-              {loading ? <Spinner className="size-12" /> : <Power className="size-12" strokeWidth={2.2} />}
-            </button>
-            <CharacterMorph
-              texts={[status]}
-              reserveTexts={statusWidthTexts}
-              interval={3000}
-              className="astra-state"
-            />
-            <div className="astra-pills">
-              <span className="astra-chip acc">{mainSwitchMode === 'tun' ? t('astra.tun') : t('astra.sysProxy')}</span>
-              <span className="astra-chip">
-                {controledMihomoConfig?.mode === 'global' ? t('astra.global') : t('astra.rule')}
-              </span>
+          {/* Noctur: the eclipse shows the state; the button under it connects and disconnects, and
+              so does a click on the moon (a mouse shortcut; keyboard and screen readers use the
+              button). Calm: the power switch from Astra Clash 1.0.6 does both, with no moon. */}
+          <div className="noctur-home-center">
+            {calm ? (
+              <button
+                type="button"
+                disabled={isDisabled}
+                onClick={() => onValueChange(!isSelected)}
+                data-guide="home-power-toggle"
+                aria-label={
+                  (loading ? loadingDirection === 'connecting' : !isSelected)
+                    ? t('noctur.home.connect')
+                    : t('noctur.home.disconnect')
+                }
+                className={`noctur-power${isSelected || (loading && loadingDirection === 'connecting') ? ' on' : ''}${loading ? ' busy' : ''}`}
+              >
+                {loading ? (
+                  <Spinner className="size-12" />
+                ) : (
+                  <Power className="size-12" strokeWidth={2.2} />
+                )}
+              </button>
+            ) : (
+              <div className="noctur-eclipse">
+                <Eclipse
+                  className="noctur-eclipse-art"
+                  state={eclipseState}
+                  moon={light ? 'day' : 'earthshine'}
+                  light={light}
+                  animate={connectJump}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  disabled={isDisabled}
+                  onClick={() => onValueChange(!isSelected)}
+                  className="noctur-moon-button"
+                />
+              </div>
+            )}
+            <span key={status} className="noctur-state noctur-fade">
+              {status}
+            </span>
+            <p className="noctur-substate flag-emoji">
+              {showConnectedTimer ? (
+                <>
+                  {t('noctur.home.through', { node: firstGroup?.now || firstGroup?.name || '' })}{' '}
+                  <span className="noctur-fixed">
+                    <ConnectedTimer active={isSelected} />
+                  </span>
+                </>
+              ) : !loading && currentProfile ? (
+                t('noctur.home.ready', { profile: currentProfile.name })
+              ) : (
+                '\u00a0'
+              )}
+            </p>
+            <div className="noctur-pills">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="noctur-chip acc noctur-chip-btn"
+                    disabled={loading}
+                    aria-label={t('noctur.home.method')}
+                  >
+                    {mainSwitchMode === 'tun' ? t('noctur.tun') : t('noctur.sysProxyShort')}
+                    <ChevronDown className="size-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center">
+                  <DropdownMenuRadioGroup value={mainSwitchMode} onValueChange={changeMethod}>
+                    <DropdownMenuRadioItem value="tun">
+                      {t('noctur.tun')}
+                      <span className="noctur-method-hint">{t('noctur.home.tunHint')}</span>
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="sysproxy" disabled={isSelected && proxyUnusable}>
+                      {t('noctur.sysProxyShort')}
+                      <span className="noctur-method-hint">{t('noctur.home.proxyHint')}</span>
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {showConnectedTimer && (
-                <span className="astra-chip mono astra-fixed">
+                <span
+                  className="noctur-chip mono noctur-fixed"
+                  title={`↓ ${fixedBytes(trafficInfo.downTotal)} · ↑ ${fixedBytes(trafficInfo.upTotal)}`}
+                >
                   ↓ {fixedBytes(trafficInfo.down, true)} · ↑ {fixedBytes(trafficInfo.up, true)}
                 </span>
               )}
             </div>
-            <div aria-hidden={!showConnectedTimer} className={`astra-timer${showConnectedTimer ? ' show' : ''}`}>
-              <ConnectedTimer active={isSelected} />
-              <span className="astra-fixed">
-                <ArrowDown className="size-3" /> {fixedBytes(trafficInfo.downTotal)}
-                <ArrowUp className="size-3 ml-2" /> {fixedBytes(trafficInfo.upTotal)}
-              </span>
-            </div>
+            {!calm && (
+              <button
+                type="button"
+                disabled={isDisabled}
+                onClick={() => onValueChange(!isSelected)}
+                data-guide="home-power-toggle"
+                className={`noctur-connect${isSelected && !loading ? ' on' : ''}${loading ? ' busy' : ''}`}
+              >
+                {loading && <Spinner className="size-4" />}
+                {(loading ? loadingDirection === 'connecting' : !isSelected)
+                  ? t('noctur.home.connect')
+                  : t('noctur.home.disconnect')}
+              </button>
+            )}
           </div>
 
           {/* Selected node of the first group, and the provider's support link */}
-          <div className="astra-home-foot">
+          <div className="noctur-home-foot">
             {firstGroup && (
               <NodePicker group={firstGroup}>
-              <button
-                type="button"
-                data-guide="home-group-selector"
-                className="astra-card astra-node flag-emoji"
-              >
-                <div className="astra-node-name min-w-0 grow text-left">{firstGroup.now || firstGroup.name}</div>
-                {firstDelay >= 0 && (
-                  <span className={`astra-delay ${delayClass}`}>{firstDelay === 0 ? 'timeout' : `${firstDelay} ms`}</span>
-                )}
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </button>
+                <button
+                  type="button"
+                  data-guide="home-group-selector"
+                  className="noctur-card noctur-node flag-emoji"
+                >
+                  <div className="noctur-node-name min-w-0 grow text-left">
+                    {firstGroup.now || firstGroup.name}
+                  </div>
+                  {firstDelay >= 0 && (
+                    <span className={`noctur-delay ${delayClass}`}>
+                      {firstDelay === 0 ? 'timeout' : `${firstDelay} ms`}
+                    </span>
+                  )}
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
               </NodePicker>
             )}
           </div>

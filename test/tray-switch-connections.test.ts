@@ -54,7 +54,7 @@ const node = (name: string): object => ({ name, type: 'Vless', history: [] })
 let server: Server
 
 beforeAll(async () => {
-  s.dir = mkdtempSync(join(tmpdir(), 'astra-tray-'))
+  s.dir = mkdtempSync(join(tmpdir(), 'noctur-tray-'))
   server = createServer((req, res) => {
     s.requests.push(`${req.method} ${decodeURIComponent(req.url ?? '')}`)
     res.setHeader('Content-Type', 'application/json')

@@ -1,4 +1,4 @@
-// The package check (build/astra-check-package.cjs) runs after every package build. It rejects an
+// The package check (build/noctur-check-package.cjs) runs after every package build. It rejects an
 // app.asar with files outside the app or with private markers, accepts a clean one, and stops when
 // the marker list it was given does not exist.
 import { describe, expect, it } from 'vitest'
@@ -10,10 +10,10 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 const builder = require.resolve('app-builder-lib', { paths: [require.resolve('electron-builder')] })
 const asar = require(require.resolve('@electron/asar', { paths: [builder] }))
-const { check } = require('../build/astra-check-package.cjs')
+const { check } = require('../build/noctur-check-package.cjs')
 
 async function pack(files: Record<string, string>): Promise<{ archive: string; dir: string }> {
-  const dir = mkdtempSync(join(tmpdir(), 'astra-asar-'))
+  const dir = mkdtempSync(join(tmpdir(), 'noctur-asar-'))
   const src = join(dir, 'app')
   for (const [rel, body] of Object.entries(files)) {
     mkdirSync(join(src, rel, '..'), { recursive: true })
@@ -25,7 +25,7 @@ async function pack(files: Record<string, string>): Promise<{ archive: string; d
 }
 
 const CLEAN = {
-  'package.json': '{"name":"astra-clash"}',
+  'package.json': '{"name":"noctur"}',
   'LICENSE': 'GPL',
   'out/main/index.js': 'console.log(1)',
   'resources/icon.png': 'png',
@@ -58,13 +58,13 @@ describe('package content check', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('stops when ASTRA_PACKAGE_MARKERS names a missing file', async () => {
+  it('stops when NOCTUR_PACKAGE_MARKERS names a missing file', async () => {
     const { archive, dir } = await pack(CLEAN)
-    process.env.ASTRA_PACKAGE_MARKERS = join(dir, 'no-such-markers.txt')
+    process.env.NOCTUR_PACKAGE_MARKERS = join(dir, 'no-such-markers.txt')
     try {
       expect(() => check(archive, asar)).toThrow(/does not exist/)
     } finally {
-      delete process.env.ASTRA_PACKAGE_MARKERS
+      delete process.env.NOCTUR_PACKAGE_MARKERS
       rmSync(dir, { recursive: true, force: true })
     }
   })

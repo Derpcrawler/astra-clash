@@ -7,9 +7,9 @@ import { dataDir, logDir } from '../utils/dirs'
 import { t } from '../utils/i18n'
 
 const UPSTREAM_URL = 'https://github.com/coolcoala/koala-clash'
-const FORK_URL = 'https://github.com/Derpcrawler/astra-clash'
+const FORK_URL = 'https://github.com/Derpcrawler/noctur'
 // GPL-3.0 credits: the whole chain the code comes from, newest first. Keep in sync with the About
-// section in Settings (astra.about.credits) and `copyright` in electron-builder.yml.
+// section in Settings (noctur.about.credits) and `copyright` in electron-builder.yml.
 const FORK_NOTICE = `Modified version of Koala Clash by coolcoala (${UPSTREAM_URL}), which builds on Sparkle by xishang0128 (https://github.com/xishang0128/sparkle) and Mihomo Party by pompurin404 (https://github.com/mihomo-party-org/mihomo-party). Licensed under GPL-3.0.`
 
 export async function createApplicationMenu(): Promise<void> {
@@ -25,25 +25,25 @@ export async function createApplicationMenu(): Promise<void> {
 
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: 'Astra Clash',
+      label: 'Noctur',
       submenu: [
         {
-          label: t('menu.about') + ' ' + 'Astra Clash',
+          label: t('menu.about') + ' ' + 'Noctur',
           role: 'about'
         },
         { type: 'separator' },
-        // Astra Clash: Settings in the standard macOS place, with the standard shortcut.
+        // Noctur: Settings in the standard macOS place, with the standard shortcut.
         {
           label: t('menu.settings'),
           accelerator: 'Command+,',
           click: async (): Promise<void> => {
             await showMainWindow()
-            mainWindow?.webContents.send('astraNavigate', '/settings')
+            mainWindow?.webContents.send('nocturNavigate', '/settings')
           }
         },
         { type: 'separator' },
         {
-          label: t('menu.hide') + ' ' + 'Astra Clash',
+          label: t('menu.hide') + ' ' + 'Noctur',
           accelerator: 'Command+H',
           role: 'hide'
         },
@@ -157,7 +157,7 @@ export async function createApplicationMenu(): Promise<void> {
           }
         },
         { type: 'separator' },
-        // Astra Clash: the folders from the removed Tools menu that help when reporting a problem.
+        // Noctur: the folders from the removed Tools menu that help when reporting a problem.
         // Developer tools stay reachable by pressing F12 five times (renderer main.tsx).
         {
           label: t('menu.showLogs'),

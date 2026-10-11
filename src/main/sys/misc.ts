@@ -40,7 +40,7 @@ export async function openUWPTool(): Promise<void> {
 export async function setupFirewall(): Promise<void> {
   const execPromise = promisify(exec)
   const appName = app.getName()
-  // Astra Clash: rules carry the app's name and only those are replaced. Upstream removed rules
+  // Noctur: rules carry the app's name and only those are replaced. Upstream removed rules
   // named "mihomo", "mihomo-alpha", "Sparkle" and "Mihomo Party", which belong to other apps.
   const coreRule = `${appName} mihomo`
   const alphaRule = `${appName} mihomo-alpha`
@@ -68,9 +68,9 @@ export function setNativeTheme(theme: 'system' | 'light' | 'dark'): void {
   nativeTheme.themeSource = theme
 }
 
-// Astra Clash: own task and helper names, so the app does not replace Koala Clash's task on a PC
+// Noctur: own task and helper names, so the app does not replace Koala Clash's task on a PC
 // that has both. The helper is built from build/runner/ by scripts/prepare.mjs.
-export const ELEVATE_TASK = 'astra-clash-run'
+export const ELEVATE_TASK = 'noctur-run'
 
 const elevateTaskXml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">

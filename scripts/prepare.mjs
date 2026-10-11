@@ -9,7 +9,7 @@ import { execSync } from 'child_process'
 
 const cwd = process.cwd()
 const TEMP_DIR = path.join(cwd, 'node_modules/.temp')
-// Astra Clash: target from the arguments, so a Windows build can be prepared on a Mac.
+// Noctur: target from the arguments, so a Windows build can be prepared on a Mac.
 //   node scripts/prepare.mjs [--x64|--arm64|--ia32] [--win|--mac|--linux]
 const PLATFORM_ARGS = { '--win': 'win32', '--mac': 'darwin', '--linux': 'linux' }
 const ARCH_ARGS = ['--x64', '--arm64', '--ia32']
@@ -27,7 +27,7 @@ if (process.env.SKIP_PREPARE === '1') {
   process.exit(0)
 }
 
-// Astra Clash: remove binaries left by a run for another target, so a build never ships them.
+// Noctur: remove binaries left by a run for another target, so a build never ships them.
 for (const dir of ['sidecar', 'files']) {
   const full = path.join(cwd, 'extra', dir)
   if (!fs.existsSync(full)) continue
@@ -241,7 +241,7 @@ async function resolveResource(binInfo) {
   fs.mkdirSync(resDir, { recursive: true })
   await downloadFile(downloadURL, targetPath)
 
-  // Astra Clash: binaries that can run as root are pinned by hash. A moved tag stops the build.
+  // Noctur: binaries that can run as root are pinned by hash. A moved tag stops the build.
   if (sha256) {
     const actual = createHash('sha256').update(fs.readFileSync(targetPath)).digest('hex')
     if (actual !== sha256) {
@@ -269,7 +269,7 @@ async function downloadFile(url, path) {
     method: 'GET',
     headers: { 'Content-Type': 'application/octet-stream' }
   })
-  // Astra Clash: a failed download stops the script instead of being saved as the file.
+  // Noctur: a failed download stops the script instead of being saved as the file.
   if (!response.ok) throw new Error(`download failed with HTTP ${response.status}: ${url}`)
   const buffer = await response.arrayBuffer()
   fs.writeFileSync(path, new Uint8Array(buffer))
@@ -306,7 +306,7 @@ const resolveEnableLoopback = () =>
   resolveResource({
     file: 'enableLoopback.exe',
     downloadURL: `https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe`,
-    // Astra Clash: pinned, the "latest" tag can change. Checked 2026-09-29 (release of 2023-11-22).
+    // Noctur: pinned, the "latest" tag can change. Checked 2026-09-29 (release of 2023-11-22).
     sha256: 'f0c328376bd5ae0ef3b0eb19ac1f343c24a9abfe7bc1008d3b2f6ef3573d04d1'
   })
 const resolveSparkleService = () => {
@@ -325,7 +325,7 @@ const resolveSparkleService = () => {
   const base = map[`${platform}-${arch}`]
   const ext = platform === 'win32' ? '.exe' : ''
 
-  // Astra Clash: pinned by hash because the pre-release tag can change and the app runs this as root.
+  // Noctur: pinned by hash because the pre-release tag can change and the app runs this as root.
   // All three come from the upload of 2026-10-03 (commit dbe85a6, Go 1.26.8), checked 2026-10-08.
   // Only the platforms the fork builds for are pinned.
   const pinned = {
@@ -343,18 +343,18 @@ const resolveSparkleService = () => {
     sha256: pinned[`${platform}-${arch}`]
   })
 }
-// Astra Clash: the launcher that starts the app as administrator is built from build/runner/
+// Noctur: the launcher that starts the app as administrator is built from build/runner/
 // instead of downloading koala-clash-run.exe from a moving tag. Needs Go 1.21 or newer.
 const resolveRunner = async () => {
   const goArch = { x64: 'amd64', ia32: '386', arm64: 'arm64' }[arch]
-  const target = path.join(cwd, 'extra', 'files', 'astra-clash-run.exe')
+  const target = path.join(cwd, 'extra', 'files', 'noctur-run.exe')
   fs.mkdirSync(path.dirname(target), { recursive: true })
   execSync(`go build -trimpath -ldflags "-H windowsgui -s -w -buildid=" -o "${target}" .`, {
     cwd: path.join(cwd, 'build', 'runner'),
     env: { ...process.env, GOOS: 'windows', GOARCH: goArch, GOAMD64: 'v1', CGO_ENABLED: '0' },
     stdio: 'inherit'
   })
-  console.log(`[INFO]: astra-clash-run.exe built`)
+  console.log(`[INFO]: noctur-run.exe built`)
 }
 
 const resolveFont = async () => {
@@ -411,7 +411,7 @@ const tasks = [
     retry: 1,
     winOnly: true
   }
-  // Astra Clash: 7za.exe is not downloaded; only the removed self-update used it.
+  // Noctur: 7za.exe is not downloaded; only the removed self-update used it.
 ]
 
 async function runTask() {

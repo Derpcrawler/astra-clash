@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { spawn, ChildProcess } from 'child_process'
 import { DEFAULT_STOP_TIMINGS, killChildNow, stopChildProcess } from '../src/main/core/child-process'
-import { shutdownAndExit } from '../src/main/astra/shutdown-sequence'
+import { shutdownAndExit } from '../src/main/noctur/shutdown-sequence'
 
 function startCore(ignoreSignals: boolean): Promise<ChildProcess> {
   const code = ignoreSignals

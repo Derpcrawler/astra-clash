@@ -63,7 +63,7 @@ async function socketPath(): Promise<string> {
 }
 
 const fallback = (): string => join(paths.userData, 'run')
-const sock = (dir: string): string => join(dir, 'astra-clash-mihomo-api.sock')
+const sock = (dir: string): string => join(dir, 'noctur-mihomo-api.sock')
 function privateDir(p: string): string {
   mkdirSync(p, { recursive: true, mode: 0o700 })
   chmodSync(p, 0o700)
@@ -134,7 +134,7 @@ describe('Linux control socket folder', () => {
     process.env.XDG_RUNTIME_DIR = privateDir(join(root, long))
     paths.userData = privateDir(join(root, long, 'data'))
     const p = await socketPath()
-    expect(p).toBe(sock(join(process.env.TMPDIR!, `astra-clash-${process.getuid!()}`)))
+    expect(p).toBe(sock(join(process.env.TMPDIR!, `noctur-${process.getuid!()}`)))
     expect(Buffer.byteLength(p.replace('api', 'external'))).toBeLessThan(108)
   })
 
@@ -148,7 +148,7 @@ describe('Linux control socket folder', () => {
   it('empties its own fallback folder that was open to others instead of reusing what is in it', async () => {
     mkdirSync(fallback())
     chmodSync(fallback(), 0o777)
-    const planted = join(fallback(), 'astra-clash-mihomo-api.sock')
+    const planted = join(fallback(), 'noctur-mihomo-api.sock')
     symlinkSync(join(root, 'someone-elses.sock'), planted)
     expect(await socketPath()).toBe(sock(fallback()))
     expect(lstatSync(fallback()).mode & 0o777).toBe(0o700)

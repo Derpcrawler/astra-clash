@@ -85,7 +85,14 @@ import {
   getCurrentProfileStr
 } from '../core/factory'
 import { getInterfaces } from '../sys/interface'
-import { closeTrayIcon, copyEnv, setDockVisible, showTrayIcon, updateTrayIcon } from '../resolve/tray'
+import { changeConnectionMethod, setConnected, setMethodEnabled } from '../noctur/connection'
+import {
+  closeTrayIcon,
+  copyEnv,
+  setDockVisible,
+  showTrayIcon,
+  updateTrayIcon
+} from '../resolve/tray'
 import { registerShortcut } from '../resolve/shortcut'
 import {
   closeMainWindow,
@@ -106,7 +113,7 @@ import {
   writeTheme
 } from '../resolve/theme'
 import { declineElevation } from './elevation'
-import { elevatedArgs, elevatedStartScript } from '../astra/admin-relaunch'
+import { elevatedArgs, elevatedStartScript } from '../noctur/admin-relaunch'
 import { safeSend } from './safeSend'
 import { appendFile } from 'fs/promises'
 import { promisify } from 'util'
@@ -119,7 +126,13 @@ import { getAppName } from './appName'
 import { getUserAgent } from './userAgent'
 import { setLanguage } from './i18n'
 import { updateApplicationMenu } from '../resolve/menu'
-import { coreState, downloadCore, latestCore, removeCore, useDownloadedCore } from '../astra/core-download'
+import {
+  coreState,
+  downloadCore,
+  latestCore,
+  removeCore,
+  useDownloadedCore
+} from '../noctur/core-download'
 
 function ipcErrorWrapper<T>( // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fn: (...args: any[]) => Promise<T> // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,12 +166,14 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('mihomoRules', ipcErrorWrapper(mihomoRules))
   ipcMain.handle('mihomoProxies', ipcErrorWrapper(mihomoProxies))
   ipcMain.handle('mihomoGroups', ipcErrorWrapper(mihomoGroups))
-  // Astra Clash: downloaded mihomo cores
-  ipcMain.handle('astraLatestCore', () => ipcErrorWrapper(latestCore)())
-  ipcMain.handle('astraCoreState', () => ipcErrorWrapper(coreState)())
-  ipcMain.handle('astraDownloadCore', () => ipcErrorWrapper(downloadCore)())
-  ipcMain.handle('astraUseDownloadedCore', (_e, version) => ipcErrorWrapper(useDownloadedCore)(version))
-  ipcMain.handle('astraRemoveCore', (_e, version) => ipcErrorWrapper(removeCore)(version))
+  // Noctur: downloaded mihomo cores
+  ipcMain.handle('nocturLatestCore', () => ipcErrorWrapper(latestCore)())
+  ipcMain.handle('nocturCoreState', () => ipcErrorWrapper(coreState)())
+  ipcMain.handle('nocturDownloadCore', () => ipcErrorWrapper(downloadCore)())
+  ipcMain.handle('nocturUseDownloadedCore', (_e, version) =>
+    ipcErrorWrapper(useDownloadedCore)(version)
+  )
+  ipcMain.handle('nocturRemoveCore', (_e, version) => ipcErrorWrapper(removeCore)(version))
   ipcMain.handle('mihomoProxyProviders', ipcErrorWrapper(mihomoProxyProviders))
   ipcMain.handle('mihomoUpdateProxyProviders', (_e, name) =>
     ipcErrorWrapper(mihomoUpdateProxyProviders)(name)
@@ -272,6 +287,13 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('showTrayIcon', () => ipcErrorWrapper(showTrayIcon)())
   ipcMain.handle('closeTrayIcon', () => ipcErrorWrapper(closeTrayIcon)())
   ipcMain.handle('updateTrayIcon', () => ipcErrorWrapper(updateTrayIcon)())
+  ipcMain.handle('changeConnectionMethod', (_e, to) => ipcErrorWrapper(changeConnectionMethod)(to))
+  ipcMain.handle('setConnected', (_e, enable) => ipcErrorWrapper(setConnected)(enable === true))
+  ipcMain.handle('setConnectionMethodEnabled', (_e, method, enable) => {
+    if (method !== 'tun' && method !== 'sysproxy')
+      return { invokeError: `unknown connection method: ${method}` }
+    return ipcErrorWrapper(setMethodEnabled)(method, enable === true)
+  })
   ipcMain.handle('setDockVisible', (_e, visible: boolean) => setDockVisible(visible))
   ipcMain.handle('showMainWindow', showMainWindow)
   ipcMain.handle('closeMainWindow', closeMainWindow)
@@ -298,7 +320,7 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('applyTheme', (_e, theme) => ipcErrorWrapper(applyTheme)(theme))
   ipcMain.handle('copyEnv', (_e, type) => ipcErrorWrapper(copyEnv)(type))
   ipcMain.handle('alert', (_e, msg) => {
-    showError('Astra Clash', msg)
+    showError('Noctur', msg)
   })
   ipcMain.handle('resetAppConfig', resetAppConfig)
   ipcMain.handle('relaunchApp', () => {
@@ -316,6 +338,8 @@ export function registerIpcMainHandlers(): void {
   })
   ipcMain.handle('setLanguage', async (_e, lang: string) => {
     setLanguage(lang)
+    // Noctur: saved so the next start uses it before the window loads (utils/i18n.ts pickLanguage).
+    if ((await getAppConfig()).language !== lang) await patchAppConfig({ language: lang })
     ipcMain.emit('updateTrayMenu')
     await updateApplicationMenu()
   })
@@ -345,8 +369,8 @@ export function registerIpcMainHandlers(): void {
   )
   ipcMain.handle('restartAsAdmin', async () => {
     if (process.platform !== 'win32') return false
-    // Astra Clash: ask for the elevated start while this window is in front, and quit only after it
-    // succeeded (astra/admin-relaunch.ts). Upstream quit first and asked from a hidden background
+    // Noctur: ask for the elevated start while this window is in front, and quit only after it
+    // succeeded (noctur/admin-relaunch.ts). Upstream quit first and asked from a hidden background
     // process; on the owner's PC that left nothing running.
     const log = (line: string): Promise<void> =>
       appendFile(logPath(), `[Elevation]: ${line}\n`).catch(() => {})
@@ -371,7 +395,7 @@ export function registerIpcMainHandlers(): void {
     await log('elevated copy started, quitting this one')
     await patchAppConfig({ elevationDeclined: false }).catch(() => {})
     setNotQuitDialog()
-    // The quit below ends with an explicit exit within about 4.5 s (astra/shutdown-sequence.ts),
+    // The quit below ends with an explicit exit within about 4.5 s (noctur/shutdown-sequence.ts),
     // including a forced kill of a core that does not stop. This is only a last resort in case the
     // quit never starts; the elevated copy waits up to 15 s for this process.
     setTimeout(() => app.exit(), 8000)

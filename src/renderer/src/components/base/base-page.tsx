@@ -16,7 +16,7 @@ interface Props {
   children?: React.ReactNode
   contentClassName?: string
   showBackButton?: boolean
-  // Astra Clash: a slim drag strip instead of the title row, for pages without a title (Home).
+  // Noctur: a slim drag strip instead of the title row, for pages without a title (Home).
   compactHeader?: boolean
 }
 
@@ -24,7 +24,7 @@ const BasePage = forwardRef<HTMLDivElement, Props>((props, ref) => {
   const location = useLocation()
   const navigate = useNavigate()
   const isSubPage = !sidebarPaths.has(location.pathname)
-  // Astra Clash: macOS and Windows draw native window buttons over the frameless window. Linux has
+  // Noctur: macOS and Windows draw native window buttons over the frameless window. Linux has
   // no such overlay, so without the system title bar the page draws its own buttons there.
   const { appConfig } = useAppConfig()
   const drawWindowControls =
@@ -40,9 +40,9 @@ const BasePage = forwardRef<HTMLDivElement, Props>((props, ref) => {
 
   return (
     <div ref={contentRef} className="w-full h-full">
-      <div className="astra-ph sticky top-0 z-40 w-full">
-        <div className={`app-drag astra-ph-row${compactClass}`}>
-          <div className="title astra-ph-title">
+      <div className="noctur-ph sticky top-0 z-40 w-full">
+        <div className={`app-drag noctur-ph-row${compactClass}`}>
+          <div className="title noctur-ph-title">
             {(isSubPage || props.showBackButton) && (
               <Button
                 size="icon-sm"
@@ -55,13 +55,13 @@ const BasePage = forwardRef<HTMLDivElement, Props>((props, ref) => {
             )}
             {props.title}
           </div>
-          <div className="header astra-ph-acts">
+          <div className="header noctur-ph-acts">
             {props.header}
             {drawWindowControls && <WindowControls />}
           </div>
         </div>
       </div>
-      <div className={`content astra-content custom-scrollbar${compactClass}`}>
+      <div className={`content noctur-content custom-scrollbar${compactClass}`}>
         {props.children}
       </div>
     </div>

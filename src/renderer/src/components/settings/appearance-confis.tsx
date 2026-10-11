@@ -1,5 +1,6 @@
-import PalettePicker from '@renderer/astra/palette-picker'
-import { DEFAULT_PALETTE } from '@renderer/astra/palettes'
+import PalettePicker from '@renderer/noctur/palette-picker'
+import { LookChoices } from '@renderer/noctur/look-preview'
+import { DEFAULT_PALETTE, hasLight } from '@renderer/noctur/palettes'
 import React, { useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import SettingCard from '../base/base-setting-card'
@@ -50,7 +51,7 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
   const [customThemes, setCustomThemes] = useState<{ key: string; label: string }[]>()
   const [openCSSEditor, setOpenCSSEditor] = useState(false)
   const [fetching, setFetching] = useState(false)
-  const { setTheme } = useTheme()
+  const { setTheme, resolvedTheme } = useTheme()
   const {
     useDockIcon = true,
     proxyInTray = true,
@@ -62,6 +63,7 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
     palette = DEFAULT_PALETTE,
     starField = true,
     connectJump = true,
+    look = 'noctur',
     appTheme = 'system'
   } = appConfig || {}
   const [localShowFloating, setLocalShowFloating] = useState(showFloating)
@@ -100,20 +102,31 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
           }}
         />
       )}
-      <SettingCard title={t('astra.settings.appearance')}>
-        <div className="astra-row-block">
-          <h4>{t('settings.appearance.palette')}</h4>
-          <PalettePicker
-            value={palette}
-            onChange={(id) => patchAppConfig({ palette: id })}
-          />
+      <SettingCard title={t('noctur.settings.appearance')}>
+        <div className="noctur-row-block noctur-look-palette">
+          <div>
+            <h4>{t('noctur.look.title')}</h4>
+            <LookChoices
+              compact
+              value={look}
+              light={resolvedTheme === 'light'}
+              onChange={(v) => patchAppConfig({ look: v, lookChosen: true })}
+            />
+          </div>
+          <div>
+            <h4>{t('settings.appearance.palette')}</h4>
+            <PalettePicker value={palette} look={look} onChange={(id) => patchAppConfig({ palette: id })} />
+          </div>
         </div>
-        <SettingItem title={t('astra.appearance.starField')}>
+        <SettingItem title={t('noctur.appearance.starField')}>
           <Switch checked={starField} onCheckedChange={(v) => patchAppConfig({ starField: v })} />
         </SettingItem>
-        <SettingItem title={t('astra.appearance.connectJump')}>
-          <Switch checked={connectJump} onCheckedChange={(v) => patchAppConfig({ connectJump: v })} />
-        </SettingItem>
+        {/* The sunrise on the moon; Calm has no moon. */}
+        {look !== 'calm' && (
+          <SettingItem title={t('noctur.appearance.connectJump')}>
+            <Switch checked={connectJump} onCheckedChange={(v) => patchAppConfig({ connectJump: v })} />
+          </SettingItem>
+        )}
         <SettingItem
           title={t('settings.appearance.showFloatingWindow')}
           actions={
@@ -217,21 +230,24 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
             }}
           />
         </SettingItem>
-        <SettingItem title={t('settings.appearance.backgroundColor')} divider={showHiddenSettings}>
-          <Tabs
-            value={appTheme}
-            onValueChange={(value) => {
-              setTheme(value)
-              patchAppConfig({ appTheme: value as AppTheme })
-            }}
-          >
-            <TabsList>
-              <TabsTrigger value="system">{t('settings.appearance.auto')}</TabsTrigger>
-              <TabsTrigger value="dark">{t('settings.appearance.dark')}</TabsTrigger>
-              <TabsTrigger value="light">{t('settings.appearance.light')}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </SettingItem>
+        {/* Noctur: light mode exists only for the Noctur palette (and imported custom themes). */}
+        {(customTheme !== 'default.css' || hasLight(palette)) && (
+          <SettingItem title={t('settings.appearance.backgroundColor')} divider={showHiddenSettings}>
+            <Tabs
+              value={appTheme}
+              onValueChange={(value) => {
+                setTheme(value)
+                patchAppConfig({ appTheme: value as AppTheme })
+              }}
+            >
+              <TabsList>
+                <TabsTrigger value="system">{t('settings.appearance.auto')}</TabsTrigger>
+                <TabsTrigger value="dark">{t('settings.appearance.dark')}</TabsTrigger>
+                <TabsTrigger value="light">{t('settings.appearance.light')}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </SettingItem>
+        )}
         {showHiddenSettings && (
           <SettingItem
             title={t('settings.appearance.theme')}

@@ -314,7 +314,7 @@ export const mihomoHotReloadConfig = async (): Promise<void> => {
   const { diffWorkDir = false } = await getAppConfig()
   const { mihomoWorkConfigPath } = await import('../utils/dirs')
   const configPath = diffWorkDir ? mihomoWorkConfigPath(current) : mihomoWorkConfigPath('work')
-  // Astra Clash: wait for the new config's providers, then tell the window to refresh groups and
+  // Noctur: wait for the new config's providers, then tell the window to refresh groups and
   // rules; a failed reload announces nothing.
   // This reload's own wait: a failure cancels only it, never a newer reload's or a restart's wait.
   const wait = await resetProviderTracking()
@@ -333,8 +333,8 @@ export const startMihomoTraffic = async (): Promise<void> => {
   await mihomoTraffic()
 }
 
-// Astra Clash: one of the core's live streams. On Linux the socket folder can have any name
-// (astra/private-dir.ts), and ws reads "ws+unix:<path>" as a URL, so a space or a non-ASCII
+// Noctur: one of the core's live streams. On Linux the socket folder can have any name
+// (noctur/private-dir.ts), and ws reads "ws+unix:<path>" as a URL, so a space or a non-ASCII
 // character in the path is percent-encoded and the stream connects to a different path than the
 // API client. There the stream connects to the checked path itself. macOS and Windows keep their
 // fixed addresses. When no socket folder qualifies, no stream starts (the core cannot run either);

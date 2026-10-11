@@ -116,7 +116,7 @@ const ProxyItem: React.FC<Props> = React.memo((props) => {
                     {proxy.name}
                   </span>
                 </div>
-                <div className="text-[11px] text-muted-foreground leading-none mt-0.5">
+                <div className="text-[11px] text-(--noctur-fg2) leading-none mt-0.5">
                   <span>{displayType}</span>
                 </div>
               </div>
@@ -156,7 +156,7 @@ const ProxyItem: React.FC<Props> = React.memo((props) => {
                   {proxy.name}
                 </span>
                 {proxyDisplayLayout === 'single' && (
-                  <span className="text-muted-foreground text-xs shrink-0" title={displayType}>
+                  <span className="text-(--noctur-fg2) text-xs shrink-0" title={displayType}>
                     {displayType}
                   </span>
                 )}

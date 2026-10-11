@@ -9,7 +9,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { promisify } from 'util'
-import { INSTALL_EXIT, installScript, osascriptArgs } from '../src/main/astra/core-install'
+import { INSTALL_EXIT, installScript, osascriptArgs } from '../src/main/noctur/core-install'
 
 const execFileP = promisify(execFile)
 const sha = (b: string): string => createHash('sha256').update(b).digest('hex')
@@ -37,9 +37,9 @@ const target = (): string => join(coreDir, NAME)
 const stagingLeft = (): string[] => (existsSync(coreDir) ? readdirSync(coreDir).filter((f) => f.startsWith('.staging')) : [])
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'astra core '))
-  coreDir = join(root, 'Astra Clash', 'cores')
-  mkdirSync(join(root, 'Astra Clash'))
+  root = mkdtempSync(join(tmpdir(), 'noctur core '))
+  coreDir = join(root, 'Noctur', 'cores')
+  mkdirSync(join(root, 'Noctur'))
   source = join(root, 'user tmp', 'mihomo')
   mkdirSync(join(root, 'user tmp'))
   writeFileSync(source, GOOD)

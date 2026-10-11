@@ -60,7 +60,7 @@ const ShortcutConfig: React.FC = () => {
   } = appConfig || {}
 
   return (
-    <SettingCard title={t('astra.settings.shortcuts')}>
+    <SettingCard title={t('noctur.settings.shortcuts')}>
       <SettingItem title={t('settings.shortcuts.toggleWindow')} divider>
         <div className="flex justify-end w-[60%]">
           <ShortcutInput
@@ -264,7 +264,7 @@ const ShortcutInput: React.FC<{
         type="button"
         variant="outline"
         size="sm"
-        className={`astra-shortcut h-7 justify-center gap-1 font-normal ${isFocused ? 'ring-2 ring-ring/50 ring-offset-2 ring-offset-background' : ''}`}
+        className={`noctur-shortcut h-7 justify-center gap-1 font-normal ${isFocused ? 'ring-2 ring-ring/50 ring-offset-2 ring-offset-background' : ''}`}
         onKeyDown={(e: KeyboardEvent<HTMLButtonElement>): void => {
           parseShortcut(e, setInputValue)
         }}

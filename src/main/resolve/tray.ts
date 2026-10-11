@@ -3,13 +3,13 @@ import {
   getAppConfig,
   getControledMihomoConfig,
   getProfileConfig,
-  patchAppConfig,
   patchControledMihomoConfig
 } from '../config'
 import icoIcon from '../../../resources/icon.ico?asset'
 import icoIconOff from '../../../resources/icon_off.ico?asset'
-import pngIcon from '../../../resources/icon.png?asset'
-import pngIconOff from '../../../resources/icon_off.png?asset'
+// Noctur: Linux tray, the blue moon (design/brand/render.py); resources/icon.png is the window icon.
+import pngIcon from '../../../resources/tray.png?asset'
+import pngIconOff from '../../../resources/tray_off.png?asset'
 import macIconOn from '../../../resources/icon_on_mac.png?asset'
 import macIconOff from '../../../resources/icon_off_mac.png?asset'
 import {
@@ -31,9 +31,7 @@ import {
   screen,
   Tray
 } from 'electron'
-import { triggerSysProxy } from '../sys/sysproxy'
-import { mihomoHotReloadConfig } from '../core/mihomoApi'
-import { floatingWindow } from './floatingWindow'
+import { changeConnectionMethod, methodUnavailable, setConnected } from '../noctur/connection'
 import { is } from '@electron-toolkit/utils'
 import { join } from 'path'
 import { applyTheme } from './theme'
@@ -132,70 +130,15 @@ async function handleTrayClick(): Promise<void> {
   }
 }
 
-// Astra Clash: menu bar template image with 1x and 2x versions, so it stays sharp on Retina.
+// Noctur: menu bar template image with 1x and 2x versions, so it stays sharp on Retina.
 function macTrayImage(file: string): Electron.NativeImage {
   const src = nativeImage.createFromPath(file)
   const image = nativeImage.createEmpty()
-  image.addRepresentation({ scaleFactor: 1, buffer: src.resize({ height: 16 }).toPNG() })
-  image.addRepresentation({ scaleFactor: 2, buffer: src.resize({ height: 32 }).toPNG() })
+  // Noctur: 18 pt, with the glyph filling the image, so it matches the size of the system icons.
+  image.addRepresentation({ scaleFactor: 1, buffer: src.resize({ height: 18 }).toPNG() })
+  image.addRepresentation({ scaleFactor: 2, buffer: src.resize({ height: 36 }).toPNG() })
   image.setTemplateImage(true)
   return image
-}
-
-type ConnectionMethod = 'tun' | 'sysproxy'
-
-// Turns one connection method on or off. TUN routes all traffic through mihomo;
-// System Proxy sets the macOS proxy when the system proxy setting is on.
-async function setConnectionMethod(method: ConnectionMethod, enable: boolean): Promise<void> {
-  const { sysProxy, onlyActiveDevice = false } = await getAppConfig()
-  if (method === 'tun') {
-    if (enable) {
-      await patchControledMihomoConfig({ tun: { enable }, dns: { enable: true } })
-    } else {
-      await patchControledMihomoConfig({ tun: { enable } })
-    }
-    mainWindow?.webContents.send('controledMihomoConfigUpdated')
-    floatingWindow?.webContents.send('controledMihomoConfigUpdated')
-  } else {
-    if (enable) {
-      await patchAppConfig({ proxyMode: true })
-      await mihomoHotReloadConfig()
-      if (sysProxy.enable) {
-        await triggerSysProxy(true, onlyActiveDevice)
-      }
-    } else {
-      if (sysProxy.enable) {
-        await triggerSysProxy(false, onlyActiveDevice)
-      }
-      await patchAppConfig({ proxyMode: false })
-      await mihomoHotReloadConfig()
-    }
-    mainWindow?.webContents.send('appConfigUpdated')
-    floatingWindow?.webContents.send('appConfigUpdated')
-  }
-}
-
-// Astra Clash: the Connection submenu. Saves which method the Enable item uses. When connected,
-// swaps the running method so the user stays connected; if the new one fails, the old one comes back.
-async function switchConnectionMethod(
-  from: ConnectionMethod,
-  to: ConnectionMethod,
-  connected: boolean
-): Promise<void> {
-  if (from === to) return
-  if (connected) {
-    await setConnectionMethod(from, false)
-    try {
-      await setConnectionMethod(to, true)
-    } catch (e) {
-      await setConnectionMethod(from, true)
-      throw e
-    }
-  }
-  await patchAppConfig({ mainSwitchMode: to })
-  mainWindow?.webContents.send('appConfigUpdated')
-  floatingWindow?.webContents.send('appConfigUpdated')
-  await updateTrayIcon()
 }
 
 export const buildContextMenu = async (): Promise<Menu> => {
@@ -213,6 +156,11 @@ export const buildContextMenu = async (): Promise<Menu> => {
     globalModeShortcut = '',
     restartAppShortcut = ''
   } = await getAppConfig()
+  const connectedNow = mainSwitchMode === 'tun' ? (tun?.enable ?? false) : proxyMode
+  const unavailable = {
+    tun: await methodUnavailable('tun'),
+    sysproxy: await methodUnavailable('sysproxy')
+  }
   let groupsMenu: Electron.MenuItemConstructorOptions[] = []
   if (proxyInTray && process.platform !== 'linux') {
     try {
@@ -295,7 +243,7 @@ export const buildContextMenu = async (): Promise<Menu> => {
       click: async (): Promise<void> => {
         const currentEnabled = mainSwitchMode === 'tun' ? (tun?.enable ?? false) : proxyMode
         try {
-          await setConnectionMethod(mainSwitchMode, !currentEnabled)
+          await setConnected(!currentEnabled)
           await updateTrayIcon()
         } catch {
           // ignore
@@ -322,7 +270,7 @@ export const buildContextMenu = async (): Promise<Menu> => {
         }
       })
     },
-    // Astra Clash: proxy groups in their own section, below Profiles.
+    // Noctur: proxy groups in their own section, below Profiles.
     ...(groupsMenu.length ? [{ type: 'separator' as const }, ...groupsMenu] : []),
     { type: 'separator' },
     ...(globalModeAllowed
@@ -371,10 +319,12 @@ export const buildContextMenu = async (): Promise<Menu> => {
         label: method === 'tun' ? t('tray.tun') : t('tray.sysProxy'),
         type: 'radio' as const,
         checked: mainSwitchMode === method,
+        // While connected, a method that cannot work now is not offered (noctur/connection.ts).
+        enabled: !(connectedNow && method !== mainSwitchMode && unavailable[method]),
         click: async (): Promise<void> => {
-          const connected = mainSwitchMode === 'tun' ? (tun?.enable ?? false) : proxyMode
           try {
-            await switchConnectionMethod(mainSwitchMode, method, connected)
+            await changeConnectionMethod(method)
+            await updateTrayIcon()
           } catch (e) {
             new Notification({
               title: t('tray.connection'),
@@ -425,7 +375,7 @@ export async function createTray(): Promise<void> {
   if (process.platform === 'win32') {
     tray = new Tray(icoIcon)
   }
-  tray?.setToolTip('Astra Clash')
+  tray?.setToolTip('Noctur')
   tray?.setIgnoreDoubleClickEvents(true)
   await updateTrayIcon()
   if (process.platform === 'darwin') {

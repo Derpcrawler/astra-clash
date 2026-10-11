@@ -1,9 +1,16 @@
 export default {
-  astra: {
-    about: { credits: 'Astra Clash — изменённая версия Koala Clash от coolcoala, основанного на Sparkle от xishang0128 и Mihomo Party от pompurin404. Распространяется по лицензии GPL-3.0.' },
+  noctur: {
+    about: {
+      credits:
+        'Noctur — изменённая версия Koala Clash от coolcoala, основанного на Sparkle от xishang0128 и Mihomo Party от pompurin404. Распространяется по лицензии GPL-3.0.'
+    },
     palettes: { more: 'Ещё', less: 'Свернуть' },
     profile: { every: 'каждые {{interval}}' },
-    picker: { test: 'Проверить задержку', auto: 'Эта группа выбирает узел автоматически.', all: 'Все группы прокси' },
+    picker: {
+      test: 'Проверить задержку',
+      auto: 'Эта группа выбирает узел автоматически.',
+      all: 'Все группы прокси'
+    },
     core: {
       upToDate: '{{version}}, совпадает со встроенным',
       title: 'Ядро',
@@ -18,9 +25,67 @@ export default {
       remove: 'Удалить',
       note: 'Ядро скачивается с GitHub MetaCubeX и проверяется по SHA-256, который публикует GitHub. Пароль запрашивается один раз для каждого ядра, чтобы оно могло работать в режиме TUN.'
     },
+    look: {
+      title: 'Вид',
+      noctur: 'Noctur',
+      calm: 'Спокойный',
+      nocturDesc: 'При подключении над луной восходит солнце, а по небу плывут сияния и звёзды.',
+      calmDesc:
+        'Простая кнопка включения на неподвижном небе. Ничего не движется, пока вы сами не нажмёте.',
+      welcome: 'Добро пожаловать в Noctur',
+      pick: 'Выберите вид для начала. Его можно сменить в любой момент в настройках.',
+      continue: 'Продолжить'
+    },
+    update: {
+      available: 'Доступна новая версия Noctur:',
+      whatsNew: 'Что нового',
+      update: 'Обновить Noctur',
+      download: 'Скачать',
+      downloading: 'Загрузка Noctur {{version}}',
+      cancel: 'Отмена',
+      installing: 'Установка Noctur {{version}}…',
+      restarting: 'Установлено. Перезапуск Noctur…',
+      confirmMac: 'Подтвердите в системном окне, чтобы установить Noctur {{version}}',
+      closingWin: 'Noctur закроется и откроется снова после установки {{version}}',
+      failedDownload: 'Не удалось скачать Noctur {{version}}.',
+      failedInstall: 'Не удалось установить Noctur {{version}}.',
+      tryAgain: 'Повторить',
+      fromGitHub: 'Скачать с GitHub',
+      notesTitle: 'Что нового в Noctur {{version}}',
+      onGitHub: 'Открыть на GitHub',
+      upToDate: 'У вас последняя версия Noctur ({{version}})',
+      availableToast: 'Доступна версия Noctur {{version}}. Обновить можно на главном экране.',
+      settingCheck: 'Проверять новые версии',
+      checkFailed: 'Не удалось проверить обновления. Попробуйте позже.'
+    },
     appearance: { starField: 'Звёздное поле', connectJump: 'Анимация подключения' },
-    settings: { connection: 'Подключение', general: 'Основные', appearance: 'Оформление', advanced: 'Дополнительно', shortcuts: 'Сочетания клавиш', about: 'О программе' },
-    nav: { home: 'Главная', proxies: 'Группы прокси', profiles: 'Профили', connections: 'Соединения', rules: 'Правила', logs: 'Журнал', settings: 'Настройки' },
+    settings: {
+      connection: 'Подключение',
+      general: 'Основные',
+      appearance: 'Оформление',
+      advanced: 'Дополнительно',
+      shortcuts: 'Сочетания клавиш',
+      about: 'О программе'
+    },
+    nav: {
+      home: 'Главная',
+      proxies: 'Группы прокси',
+      profiles: 'Профили',
+      connections: 'Соединения',
+      rules: 'Правила',
+      logs: 'Журнал',
+      settings: 'Настройки'
+    },
+    home: {
+      through: 'Через {{node}}:',
+      ready: 'Готово к подключению: {{profile}}',
+      connect: 'Подключить',
+      disconnect: 'Отключить',
+      used: 'Использовано {{used}} из {{total}}',
+      method: 'Способ подключения',
+      tunHint: 'все приложения',
+      proxyHint: 'поддерживающие прокси'
+    },
     rule: 'Правила',
     global: 'Глобально',
     connected: 'Подключено',
@@ -453,7 +518,7 @@ export default {
     pleaseConfirm: 'Подтвердите действие',
     confirmDelete: 'Подтвердить удаление',
     confirmImportProfile: 'Импортировать конфигурацию подписки?',
-    confirmQuit: 'Вы уверены, что хотите выйти из Astra Clash?',
+    confirmQuit: 'Вы уверены, что хотите выйти из Noctur?',
     quitWarning: 'После выхода прокси перестанет работать',
     quickQuitHint: 'Нажмите дважды или удерживайте кнопку',
     canQuitDirectly: 'для быстрого выхода',
@@ -693,7 +758,7 @@ export default {
       registerTaskSchedule: 'Зарегистрировать задачу'
     },
     serviceModal: {
-      title: 'Управление службой Astra Clash',
+      title: 'Управление службой Noctur',
       serviceStatus: 'Состояние службы',
       connectionStatus: 'Состояние подключения',
       checking: 'Проверка',
@@ -966,10 +1031,8 @@ export default {
     done: 'Готово',
     skipTour: 'Пропустить',
     addProfileTitle: 'Добавить профиль',
-    addProfileDesc:
-      'На главной пока нет профилей. Нажмите «Добавить профиль», чтобы начать.',
-    openImportFlowRequired:
-      'Нажмите «Добавить профиль», чтобы продолжить.',
+    addProfileDesc: 'На главной пока нет профилей. Нажмите «Добавить профиль», чтобы начать.',
+    openImportFlowRequired: 'Нажмите «Добавить профиль», чтобы продолжить.',
     insertLinkTitle: 'Вставить ссылку',
     insertLinkDesc:
       'Нажмите кнопку вставки справа, чтобы вставить ссылку на подписку из буфера обмена.',
@@ -978,11 +1041,9 @@ export default {
     importProfileDesc: 'Нажмите «Импорт».',
     completeImportRequired: 'Сначала завершите импорт профиля.',
     deepLinkImportTitle: 'Импорт по ссылке',
-    deepLinkImportDesc:
-      'Подтвердите импорт в этом окне, чтобы профиль добавился в приложение.',
+    deepLinkImportDesc: 'Подтвердите импорт в этом окне, чтобы профиль добавился в приложение.',
     adminRequiredTitle: 'Нужны права администратора',
-    adminRequiredDesc:
-      'Подтвердите перезапуск от имени администратора в этом окне.',
+    adminRequiredDesc: 'Подтвердите перезапуск от имени администратора в этом окне.',
     deepLinkConfirmRequired: 'Сначала подтвердите импорт.',
     profileHeaderTitle: 'Заголовок профиля',
     profileHeaderDesc: 'Здесь показаны логотип и название вашего VPN-профиля.',
@@ -995,18 +1056,16 @@ export default {
     firstGroupTitle: 'Прокси-группа',
     firstGroupDesc: 'Нажмите на группу, чтобы раскрыть список серверов.',
     firstGroupExpandedTitle: 'Список серверов',
-    firstGroupExpandedDesc:
-      'Перед вами список серверов — выберите любой.',
+    firstGroupExpandedDesc: 'Перед вами список серверов — выберите любой.',
     openGroupRequired: 'Сначала раскройте прокси-группу.',
     sidebarTitle: 'Боковая панель',
     sidebarDesc:
       'Панель навигации приложения. Позволяет перемещаться между страницами. Развернуть её можно кнопкой внизу.',
     sidebarHomeTitle: 'Кнопка «Главная»',
-    sidebarHomeDesc:
-      'Нажмите на иконку «Главная», чтобы вернуться на главную страницу.',
+    sidebarHomeDesc: 'Нажмите на иконку «Главная», чтобы вернуться на главную страницу.',
     supportTitle: 'Поддержка',
     supportDesc: 'Нажмите, чтобы связаться с поддержкой провайдера.',
-    welcome: 'Добро пожаловать в Astra Clash',
+    welcome: 'Добро пожаловать в Noctur',
     welcomeDesc:
       'Краткое руководство поможет быстро разобраться в приложении. Нажмите «Далее», чтобы начать.',
     navbar: 'Панель навигации',
@@ -1016,8 +1075,7 @@ export default {
     cardDesc:
       'Нажмите на карточку, чтобы открыть её настройки. У некоторых карточек есть переключатель, который работает прямо отсюда.',
     mainArea: 'Рабочая область',
-    mainAreaDesc:
-      'Основная область для просмотра и редактирования настроек.',
+    mainAreaDesc: 'Основная область для просмотра и редактирования настроек.',
     profileManagement: 'Профили',
     profileManagementDesc:
       'Карточка профиля показывает текущую подписку. Нажмите, чтобы перейти к управлению. Правый клик — быстрое переключение профилей.',
@@ -1036,8 +1094,7 @@ export default {
     tunSettings: 'Настройки TUN',
     tunSettingsDesc:
       'Режим TUN требует авторизации. Если она ещё не настроена, сделайте это в разделе «Настройки ядра».',
-    dnsDesc:
-      'Настройки DNS помогут эффективнее разрешать доменные имена и защитят от подмены DNS.',
+    dnsDesc: 'Настройки DNS помогут эффективнее разрешать доменные имена и защитят от подмены DNS.',
     tutorialEnd: 'Готово!',
     tutorialEndDesc:
       'Вы освоили основы работы с приложением. Если остались вопросы — загляните в документацию.'

@@ -17,7 +17,7 @@ let triggerSysProxyRequest = 0
 // wrong order. Each call also cancels a pending offline retry, so an old "enable" retry cannot turn
 // the proxy back on after the user disconnected. Taken from Sparkle 6831f93 and 5af4bff.
 export function triggerSysProxy(enable: boolean, onlyActiveDevice: boolean): Promise<void> {
-  // Astra Clash: once a quit is accepted, the proxy only goes off. An enable from the tray, a
+  // Noctur: once a quit is accepted, the proxy only goes off. An enable from the tray, a
   // shortcut or a start still in progress would run after the shutdown's disable and leave the
   // system pointing at the closed port.
   if (enable && isShuttingDown()) return Promise.resolve()
@@ -31,7 +31,7 @@ export function triggerSysProxy(enable: boolean, onlyActiveDevice: boolean): Pro
   return task
 }
 
-// Astra Clash: for callers that decide to enable the system proxy after waiting on something (wake
+// Noctur: for callers that decide to enable the system proxy after waiting on something (wake
 // recovery). A number that changes with every triggerSysProxy call, and an enable that happens only
 // if no call was made since that number was read. The check and the enable run in one synchronous
 // step, so a disconnect cannot slip in between.
@@ -49,7 +49,7 @@ async function applySysProxy(
   onlyActiveDevice: boolean,
   request: number
 ): Promise<void> {
-  // Astra Clash: turning the proxy off needs no network, so it never waits for one; a quit while
+  // Noctur: turning the proxy off needs no network, so it never waits for one; a quit while
   // offline would otherwise exit before the retry and leave the system pointing at a closed port.
   if (!enable) {
     await disableSysProxy(onlyActiveDevice)

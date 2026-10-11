@@ -9,24 +9,22 @@ import routes from '@renderer/routes'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import {
   applyTheme,
-  checkUpdate,
   declineElevation,
   needsFirstRunAdmin,
   restartAsAdmin,
   setNativeTheme
 } from '@renderer/utils/ipc'
 import { platform } from '@renderer/utils/init'
-import useSWR from 'swr'
 import ConfirmModal from '@renderer/components/base/base-confirm'
 import { SidebarProvider } from '@renderer/components/ui/sidebar'
-import UpdateBanner from '@renderer/components/updater/update-banner'
 import HwidLimitAlert from '@renderer/components/profiles/hwid-limit-alert'
 import WindowControls from '@renderer/components/window-controls'
 import mapDark from '@renderer/assets/map_darktheme.svg'
 import mapLight from '@renderer/assets/map_lighttheme.svg'
-import Backdrop from '@renderer/astra/backdrop'
-import AstraSidebar from '@renderer/astra/sidebar'
-import { applyPalette, DEFAULT_PALETTE } from '@renderer/astra/palettes'
+import Backdrop from '@renderer/noctur/backdrop'
+import NocturSidebar from '@renderer/noctur/sidebar'
+import LookPicker from '@renderer/noctur/look-picker'
+import { applyPalette, DEFAULT_PALETTE, hasLight } from '@renderer/noctur/palettes'
 import { attachConnectionsStore } from '@renderer/store/connections-store'
 import { attachTrafficStore } from '@renderer/store/traffic-store'
 import { attachLogsStore } from '@renderer/store/logs-store'
@@ -41,12 +39,14 @@ const App: React.FC = () => {
   const {
     appTheme = 'system',
     customTheme,
-    autoCheckUpdate,
     palette = DEFAULT_PALETTE,
     starField = true,
-    connectJump = true
+    connectJump = true,
+    look = 'noctur'
   } = appConfig || {}
-  // Astra Clash palettes apply unless an imported custom theme is chosen.
+  // First launch: the look picker shows until a look is chosen; the tour waits for it.
+  const lookPending = !!appConfig && !appConfig.lookChosen
+  // Noctur palettes apply unless an imported custom theme is chosen.
   const paletteActive = !customTheme || customTheme === 'default.css'
   const { setTheme, systemTheme, resolvedTheme } = useTheme()
   const mapBg = resolvedTheme === 'dark' ? mapDark : mapLight
@@ -54,13 +54,6 @@ const App: React.FC = () => {
   const location = useLocation()
   const isHome = location.pathname === '/' || location.pathname.includes('/home')
   const page = useRoutes(routes)
-  const { data: latest } = useSWR(
-    autoCheckUpdate ? ['checkUpdate'] : undefined,
-    autoCheckUpdate ? checkUpdate : (): undefined => {},
-    {
-      refreshInterval: 1000 * 60 * 10
-    }
-  )
 
   useEffect(() => {
     const detachConnections = attachConnectionsStore()
@@ -78,6 +71,7 @@ const App: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    if (!appConfig || lookPending) return
     const tourShown = window.localStorage.getItem('tourShown')
     if (!tourShown) {
       import('@renderer/utils/driver').then(({ startTour }) => {
@@ -88,12 +82,14 @@ const App: React.FC = () => {
         })
       })
     }
-  }, [])
+  }, [!!appConfig, lookPending])
 
+  // Noctur: only the Noctur palette has a light version; with any other palette the app stays dark.
+  const effectiveTheme = paletteActive && !hasLight(palette) ? 'dark' : appTheme
   useEffect(() => {
-    setNativeTheme(appTheme)
-    setTheme(appTheme)
-  }, [appTheme, systemTheme])
+    setNativeTheme(effectiveTheme)
+    setTheme(effectiveTheme)
+  }, [effectiveTheme, systemTheme])
 
   useEffect(() => {
     applyTheme(customTheme || 'default.css')
@@ -168,20 +164,29 @@ const App: React.FC = () => {
       defaultOpen={false}
       className="relative w-full h-screen overflow-hidden"
       style={
-        paletteActive ? undefined : { backgroundColor: resolvedTheme === 'dark' ? '#080F16' : '#C5D4F1' }
+        paletteActive
+          ? undefined
+          : { backgroundColor: resolvedTheme === 'dark' ? '#080F16' : '#C5D4F1' }
       }
     >
       {paletteActive ? (
-        <Backdrop stars={starField} jump={connectJump} />
+        // Stars on Home only (owner, 2026-10-11); the glows stay on every page.
+        <Backdrop
+          stars={starField && isHome}
+          jump={connectJump}
+          home={isHome}
+          still={look === 'calm'}
+        />
       ) : (
-      <img
-        src={mapBg}
-        alt=""
-        className={`pointer-events-none absolute inset-0 opacity-65 w-full h-full object-cover z-0 transition-[filter] duration-500 ${
-          isHome ? '' : 'blur-3xl'
-        }`}
-      />
+        <img
+          src={mapBg}
+          alt=""
+          className={`pointer-events-none absolute inset-0 opacity-65 w-full h-full object-cover z-0 transition-[filter] duration-500 ${
+            isHome ? '' : 'blur-3xl'
+          }`}
+        />
       )}
+      {lookPending && <LookPicker />}
       {showQuitConfirm && (
         <ConfirmModal
           title={t('modal.confirmQuit')}
@@ -237,7 +242,8 @@ const App: React.FC = () => {
           className="min-w-lg guide-profile-install-modal"
         />
       )}
-      {showAdminRequired && (
+      {/* Windows: after the look picker, so the two dialogs never stack */}
+      {showAdminRequired && !lookPending && (
         <ConfirmModal
           title={t('modal.adminRequired')}
           description={
@@ -271,11 +277,8 @@ const App: React.FC = () => {
           <WindowControls />
         </div>
       )}
-      <AstraSidebar />
-      {latest?.version && <UpdateBanner latest={latest} />}
-      <div className="relative z-10 main grow h-full overflow-y-auto">
-        {page}
-      </div>
+      <NocturSidebar />
+      <div className="relative z-10 main grow h-full overflow-y-auto">{page}</div>
     </SidebarProvider>
   )
 }

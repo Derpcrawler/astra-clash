@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 
 export const app = {
   getPath: (): string => tmpdir(),
-  getName: (): string => 'Astra Clash',
+  getName: (): string => 'Noctur',
   getVersion: (): string => '0.0.0-test',
   isPackaged: false,
   on: (): void => {},

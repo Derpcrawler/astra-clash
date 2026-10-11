@@ -23,9 +23,7 @@ import { stringifyYaml } from './yaml'
 import { chmod, mkdir, writeFile, cp, rm, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import {
-  startPacServer
-} from '../resolve/server'
+import { startPacServer } from '../resolve/server'
 import { triggerSysProxy } from '../sys/sysproxy'
 import {
   getAppConfig,
@@ -34,6 +32,7 @@ import {
   patchControledMihomoConfig
 } from '../config'
 import { app } from 'electron'
+import { pickLanguage, setLanguage } from './i18n'
 import { startSSIDCheck } from '../sys/ssid'
 import { startNetworkDetection } from '../core/manager'
 import { initResumeRecovery } from '../sys/resume'
@@ -44,16 +43,9 @@ async function initDirs(): Promise<void> {
   if (!existsSync(dataDir())) {
     await mkdir(dataDir())
   }
-  // Astra Clash: profiles and the config hold subscription links and the service's signing key.
+  // Noctur: profiles and the config hold subscription links and the service's signing key.
   if (process.platform !== 'win32') await chmod(dataDir(), 0o700).catch(() => {})
-  const dirs = [
-    themesDir(),
-    profilesDir(),
-    rulesDir(),
-    mihomoWorkDir(),
-    logDir(),
-    mihomoTestDir(),
-  ]
+  const dirs = [themesDir(), profilesDir(), rulesDir(), mihomoWorkDir(), logDir(), mihomoTestDir()]
   await Promise.all(
     dirs.map(async (dir) => {
       if (!existsSync(dir)) {
@@ -141,7 +133,7 @@ export async function migration(): Promise<void> {
 
   const mihomoConfigPatch: Partial<MihomoConfig> = {}
 
-  // Astra Clash: upstream turned TUN off here on every launch when controlTun was false. The app
+  // Noctur: upstream turned TUN off here on every launch when controlTun was false. The app
   // still controls tun.enable in that case (core/factory.ts, config/controledMihomo.ts), so the
   // reset only threw away the user's TUN connection at each start.
 
@@ -199,14 +191,12 @@ function initDeeplink(): void {
     if (process.argv.length >= 2) {
       app.setAsDefaultProtocolClient('clash', process.execPath, [path.resolve(process.argv[1])])
       app.setAsDefaultProtocolClient('mihomo', process.execPath, [path.resolve(process.argv[1])])
-      app.setAsDefaultProtocolClient('astra-clash', process.execPath, [
-        path.resolve(process.argv[1])
-      ])
+      app.setAsDefaultProtocolClient('noctur', process.execPath, [path.resolve(process.argv[1])])
     }
   } else {
     app.setAsDefaultProtocolClient('clash')
     app.setAsDefaultProtocolClient('mihomo')
-    app.setAsDefaultProtocolClient('astra-clash')
+    app.setAsDefaultProtocolClient('noctur')
   }
 }
 
@@ -227,6 +217,7 @@ export async function init(): Promise<void> {
       // ignore
     })
   ])
+  setLanguage(pickLanguage(appConfig.language, app.getPreferredSystemLanguages()))
 
   const {
     sysProxy,

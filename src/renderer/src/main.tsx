@@ -16,7 +16,7 @@ import { ProfileConfigProvider } from './hooks/use-profile-config'
 import { RulesProvider } from './hooks/use-rules'
 import { GroupsProvider } from './hooks/use-groups'
 
-// Astra Clash: lets CSS tell platforms apart (main.css keeps native macOS scroll bars).
+// Noctur: lets CSS tell platforms apart (main.css keeps native macOS scroll bars).
 document.documentElement.dataset.platform = platform
 
 let F12Count = 0

@@ -5,14 +5,13 @@ import {
   getAppConfig,
   getControledMihomoConfig,
   getCurrentProfileItem,
-  patchAppConfig,
   patchControledMihomoConfig
 } from '../config'
-import { triggerSysProxy } from '../sys/sysproxy'
 import { quitWithoutCore } from '../core/manager'
 import { FORK } from '../fork'
-import { floatingWindow, triggerFloatingWindow } from './floatingWindow'
+import { triggerFloatingWindow } from './floatingWindow'
 import { updateTrayIcon } from './tray'
+import { setMethodEnabled } from '../noctur/connection'
 
 export async function registerShortcut(
   oldShortcut: string,
@@ -38,29 +37,13 @@ export async function registerShortcut(
     }
     case 'triggerSysProxyShortcut': {
       return globalShortcut.register(newShortcut, async () => {
-        const {
-          proxyMode = false,
-          sysProxy: { enable: writeSysProxy = true } = { enable: true },
-          onlyActiveDevice = false
-        } = await getAppConfig()
+        const { proxyMode = false } = await getAppConfig()
         const enable = !proxyMode
         try {
-          if (enable) {
-            await patchAppConfig({ proxyMode: true })
-            if (writeSysProxy) {
-              await triggerSysProxy(true, onlyActiveDevice)
-            }
-          } else {
-            if (writeSysProxy) {
-              await triggerSysProxy(false, onlyActiveDevice)
-            }
-            await patchAppConfig({ proxyMode: false })
-          }
+          await setMethodEnabled('sysproxy', enable)
           new Notification({
             title: enable ? t('notification.sysProxyEnabled') : t('notification.sysProxyDisabled')
           }).show()
-          mainWindow?.webContents.send('appConfigUpdated')
-          floatingWindow?.webContents.send('appConfigUpdated')
           await updateTrayIcon()
         } catch {
           // ignore
@@ -72,18 +55,12 @@ export async function registerShortcut(
     case 'triggerTunShortcut': {
       return globalShortcut.register(newShortcut, async () => {
         const { tun } = await getControledMihomoConfig()
-        const enable = tun?.enable ?? false
+        const enable = !(tun?.enable ?? false)
         try {
-          if (!enable) {
-            await patchControledMihomoConfig({ tun: { enable: !enable }, dns: { enable: true } })
-          } else {
-            await patchControledMihomoConfig({ tun: { enable: !enable } })
-          }
+          await setMethodEnabled('tun', enable)
           new Notification({
-            title: !enable ? t('notification.tunEnabled') : t('notification.tunDisabled')
+            title: enable ? t('notification.tunEnabled') : t('notification.tunDisabled')
           }).show()
-          mainWindow?.webContents.send('controledMihomoConfigUpdated')
-          floatingWindow?.webContents.send('appConfigUpdated')
           await updateTrayIcon()
         } catch {
           // ignore

@@ -106,7 +106,7 @@ const TrayMenuApp: React.FC = () => {
       <div className="flex items-center justify-between px-3 py-2 border-b border-stroke">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-gradient-end-power-on animate-pulse shadow-lg shadow-gradient-end-power-on/50" />
-          <span className="text-sm font-semibold">Astra Clash</span>
+          <span className="text-sm font-semibold">Noctur</span>
         </div>
         <div className="flex items-center gap-1">
           <Button size="icon-xs" variant="ghost" onClick={handleRefresh}>

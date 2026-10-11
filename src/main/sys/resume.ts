@@ -7,7 +7,7 @@ import { logPath } from '../utils/dirs'
 import { enableSysProxyUnlessChanged, sysProxyChangeCount } from './sysproxy'
 import { isShuttingDown } from './shutdown'
 
-// Astra Clash: recovery after the Mac wakes from sleep, ported from Mihomo Party 0e3116a. Sleep can
+// Noctur: recovery after the Mac wakes from sleep, ported from Mihomo Party 0e3116a. Sleep can
 // leave the core running but no longer routing: TUN's DNS listener stops answering, connections to
 // the proxy server are dead, and macOS can drop the system proxy settings.
 //

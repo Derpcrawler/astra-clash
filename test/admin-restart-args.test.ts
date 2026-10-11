@@ -31,7 +31,7 @@ vi.mock('child_process', () => ({
 }))
 vi.mock('fs/promises', () => ({ appendFile: async () => {}, readFile: async () => '', writeFile: async () => {} }))
 vi.mock('../src/main/index', h.stub)
-vi.mock('../src/main/astra/core-download', h.stub)
+vi.mock('../src/main/noctur/core-download', h.stub)
 vi.mock('../src/main/config', h.stub)
 vi.mock('../src/main/core/factory', h.stub)
 vi.mock('../src/main/core/manager', h.stub)
@@ -61,8 +61,8 @@ const realArgv = process.argv
 beforeEach(() => {
   Object.defineProperty(process, 'platform', { value: 'win32' })
   process.argv = [
-    'C:\\Program Files\\Astra Clash\\Astra Clash.exe',
-    '--user-data-dir=C:\\Users\\Alice Smith\\Astra',
+    'C:\\Program Files\\Noctur\\Noctur.exe',
+    '--user-data-dir=C:\\Users\\Alice Smith\\Noctur',
     'clash://install-config?url=https://example.com/sub&name=Work --disable-gpu'
   ]
   h.calls.length = 0
@@ -83,7 +83,7 @@ describe('Restart as administrator', () => {
     expect(ps).toBeDefined()
     const script = ps![ps!.indexOf('-Command') + 1]
     const list = /-ArgumentList (.*?) -Verb RunAs/.exec(script)?.[1]
-    expect(list).toBe(`'--astra-after-pid=${process.pid}'`)
+    expect(list).toBe(`'--noctur-after-pid=${process.pid}'`)
     expect(script).not.toMatch(/Alice|disable-gpu|clash:/)
   })
 })

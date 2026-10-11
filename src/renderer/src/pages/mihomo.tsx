@@ -1,4 +1,4 @@
-import CorePanel from '@renderer/astra/core-panel'
+import CorePanel from '@renderer/noctur/core-panel'
 import { FORK } from '@renderer/fork'
 import { toast } from 'sonner'
 import { Button } from '@renderer/components/ui/button'
@@ -308,7 +308,7 @@ const Mihomo: React.FC = () => {
           }}
         />
       )}
-      {/* Astra Clash: downloading a newer core is macOS only for now (main/astra/core-download.ts). */}
+      {/* Noctur: downloading a newer core is macOS only for now (main/noctur/core-download.ts). */}
       {platform === 'darwin' && <CorePanel />}
       <SettingCard>
         <SettingItem

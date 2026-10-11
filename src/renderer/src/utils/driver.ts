@@ -688,7 +688,7 @@ async function createDriverWithMode(mode: GuideMode): Promise<Driver> {
     progressText: '{{current}} / {{total}}',
     overlayOpacity: 0.9,
     steps: buildGuideSteps(mode),
-    // Astra Clash: a step without an element highlights an empty point in the middle of the window;
+    // Noctur: a step without an element highlights an empty point in the middle of the window;
     // with the usual padding that point shows as a small square hole in the overlay. driver.js reads
     // these values from the live config each time it draws.
     onHighlightStarted: (element, _step, options): void => {

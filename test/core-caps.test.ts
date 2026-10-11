@@ -1,9 +1,9 @@
 // Reading getcap output for the Linux core: both output formats of libcap count as granted, and
 // capabilities that are only permitted (not effective), or missing one of the two, do not.
 import { describe, expect, it } from 'vitest'
-import { parseCoreCaps } from '../src/main/astra/core-caps'
+import { parseCoreCaps } from '../src/main/noctur/core-caps'
 
-const CORE = '/opt/Astra Clash/resources/sidecar/mihomo'
+const CORE = '/opt/Noctur/resources/sidecar/mihomo'
 
 describe('parseCoreCaps', () => {
   it('accepts both getcap output formats', () => {

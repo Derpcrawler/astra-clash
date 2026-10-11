@@ -11,14 +11,14 @@ import { useTranslation } from 'react-i18next'
 import { Github } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-// Astra Clash: one page with a section index on the left (design/mockup.html).
+// Noctur: one page with a section index on the left (design/mockup.html).
 const SECTIONS = [
-  { id: 'connection', label: 'astra.settings.connection' },
-  { id: 'general', label: 'astra.settings.general' },
-  { id: 'appearance', label: 'astra.settings.appearance' },
-  { id: 'advanced', label: 'astra.settings.advanced' },
-  { id: 'shortcuts', label: 'astra.settings.shortcuts' },
-  { id: 'about', label: 'astra.settings.about' }
+  { id: 'connection', label: 'noctur.settings.connection' },
+  { id: 'general', label: 'noctur.settings.general' },
+  { id: 'appearance', label: 'noctur.settings.appearance' },
+  { id: 'advanced', label: 'noctur.settings.advanced' },
+  { id: 'shortcuts', label: 'noctur.settings.shortcuts' },
+  { id: 'about', label: 'noctur.settings.about' }
 ]
 
 const Settings: React.FC = () => {
@@ -31,7 +31,7 @@ const Settings: React.FC = () => {
 
   // Highlight the section whose heading has passed the top of the page; the last one at the bottom.
   useEffect(() => {
-    const scroller = navRef.current?.closest('.astra-content') as HTMLElement | null
+    const scroller = navRef.current?.closest('.noctur-content') as HTMLElement | null
     if (!scroller) return
     const update = (): void => {
       if (Date.now() < clickedUntil.current) return
@@ -62,7 +62,7 @@ const Settings: React.FC = () => {
             className="app-nodrag"
             title={t('pages.settings.githubRepo')}
             onClick={() => {
-              window.open('https://github.com/Derpcrawler/astra-clash')
+              window.open('https://github.com/Derpcrawler/noctur')
             }}
           >
             <Github className="text-lg" />
@@ -70,8 +70,8 @@ const Settings: React.FC = () => {
         </>
       }
     >
-      <div className="astra-settings">
-        <nav ref={navRef} className="astra-subnav" aria-label="Sections">
+      <div className="noctur-settings">
+        <nav ref={navRef} className="noctur-subnav" aria-label="Sections">
           {SECTIONS.map((sec) => (
             <button
               key={sec.id}
@@ -89,11 +89,11 @@ const Settings: React.FC = () => {
         </nav>
         <div className="min-w-0">
           <div id="set-connection">
-            <h3 className="astra-sec-title">{t('astra.settings.connection')}</h3>
+            <h3 className="noctur-sec-title">{t('noctur.settings.connection')}</h3>
             <ProxySwitches />
           </div>
           <div id="set-general">
-            <h3 className="astra-sec-title">{t('astra.settings.general')}</h3>
+            <h3 className="noctur-sec-title">{t('noctur.settings.general')}</h3>
             <GeneralConfig showHiddenSettings={showHiddenSettings} />
             <LanguageConfig />
           </div>
@@ -107,13 +107,13 @@ const Settings: React.FC = () => {
             <ShortcutConfig />
           </div>
           <div id="set-about">
-            <h3 className="astra-sec-title">{t('astra.settings.about')}</h3>
+            <h3 className="noctur-sec-title">{t('noctur.settings.about')}</h3>
             <Actions
               showHiddenSettings={showHiddenSettings}
               onUnlockHiddenSettings={() => setShowHiddenSettings(true)}
             />
-            {/* Astra Clash: GPL-3.0 credits, shown on every platform. */}
-            <p className="astra-credits">{t('astra.about.credits')}</p>
+            {/* Noctur: GPL-3.0 credits, shown on every platform. */}
+            <p className="noctur-credits">{t('noctur.about.credits')}</p>
           </div>
         </div>
       </div>

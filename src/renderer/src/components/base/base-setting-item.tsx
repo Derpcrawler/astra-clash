@@ -12,10 +12,10 @@ const SettingItem: React.FC<Props> = (props) => {
   const { title, actions, children } = props
 
   return (
-    <div className="astra-row">
-      <div className="astra-row-label">
+    <div className="noctur-row">
+      <div className="noctur-row-label">
         <h4>{title}</h4>
-        {actions && <div className="astra-row-acts">{actions}</div>}
+        {actions && <div className="noctur-row-acts">{actions}</div>}
       </div>
       {children}
     </div>

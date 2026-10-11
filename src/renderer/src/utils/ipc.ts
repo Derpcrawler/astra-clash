@@ -393,6 +393,26 @@ export async function updateTrayIcon(): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('updateTrayIcon'))
 }
 
+// Noctur: TUN or System Proxy from Home; reconnects through the new method when connected.
+export async function changeConnectionMethod(to: 'tun' | 'sysproxy'): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('changeConnectionMethod', to))
+}
+
+// Noctur: Connect and Disconnect, queued with every other connection change in the main process.
+export async function setConnected(enable: boolean): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('setConnected', enable))
+}
+
+// Noctur: one method on or off by itself (Settings), through the same queue.
+export async function setConnectionMethodEnabled(
+  method: 'tun' | 'sysproxy',
+  enable: boolean
+): Promise<void> {
+  return ipcErrorWrapper(
+    await window.electron.ipcRenderer.invoke('setConnectionMethodEnabled', method, enable)
+  )
+}
+
 export async function setDockVisible(visible: boolean): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('setDockVisible', visible))
 }

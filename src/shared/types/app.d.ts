@@ -1,6 +1,9 @@
 interface AppVersion {
   version: string
   changelog: string
+  /** Noctur: the release page, and whether this platform has an installer in the release. */
+  page?: string
+  installable?: boolean
 }
 
 interface ISysProxyConfig {
@@ -69,15 +72,23 @@ interface AppConfig {
   useWindowFrame: boolean
   proxyInTray: boolean
   appTheme: AppTheme
-  // Astra Clash palette id, see src/renderer/src/astra/palettes.ts
+  // Noctur palette id, see src/renderer/src/noctur/palettes.ts
   palette?: string
-  // Astra Clash: stars behind the window, and the jump animation on connect
+  // Noctur: stars behind the window, and the jump animation on connect
   starField?: boolean
-  // Astra Clash: version tag of the downloaded mihomo core in use; empty for the built-in one
+  // Noctur: version tag of the downloaded mihomo core in use; empty for the built-in one
   downloadedCore?: string
   connectJump?: boolean
+  // Noctur: the look, 'noctur' (the moon and moving sky) or 'calm' (a power switch, still sky), and
+  // whether it was chosen; the first-launch picker shows until it is.
+  look?: 'noctur' | 'calm'
+  lookChosen?: boolean
   customTheme?: string
   autoCheckUpdate: boolean
+  /** Noctur: the window's language, for the main process at the next start. */
+  language?: string
+  /** Noctur: look for a newer version on GitHub (unset: on). */
+  checkUpdates?: boolean
   silentStart: boolean
   autoCloseConnection: boolean
   expandProxyGroups?: boolean
@@ -126,6 +137,7 @@ interface ProfileItem {
   name: string
   url?: string // remote
   ua?: string // remote
+  agent?: 'noctur' | 'mihomo' | 'clashMeta' // remote: the User-Agent name that got a mihomo profile
   file?: string // local
   verify?: boolean // remote
   interval?: number

@@ -18,7 +18,7 @@ function isValidConfig(config: unknown): config is AppConfig {
   return 'sysProxy' in cfg && typeof cfg.sysProxy === 'object' && cfg.sysProxy !== null
 }
 
-// Astra Clash: the config holds the service's private signing key (serviceAuthKey) as plain text,
+// Noctur: the config holds the service's private signing key (serviceAuthKey) as plain text,
 // since the keychain is not used, so the config and its temp and backup files are owner-only.
 const OWNER_ONLY = 0o600
 
@@ -36,7 +36,7 @@ function ownerOnlySync(file: string): void {
   }
 }
 
-// Astra Clash: a config file counts only when it reads, parses and has the expected shape. Any
+// Noctur: a config file counts only when it reads, parses and has the expected shape. Any
 // failure (unreadable, bad YAML, wrong shape) falls through to the backup, then to defaults.
 function parseValid(text: string): AppConfig | null {
   try {
@@ -78,7 +78,7 @@ async function safeWriteConfig(content: string): Promise<void> {
     // mode applies only when the file is created; a leftover temp file keeps its old mode.
     await ownerOnly(tmpPath)
     if (existsSync(configPath)) {
-      // Astra Clash: the current file becomes the backup only when it is a valid config, so a
+      // Noctur: the current file becomes the backup only when it is a valid config, so a
       // corrupt file never replaces the last good backup.
       if (await readValid(configPath)) {
         await copyFile(configPath, backupPath)
@@ -106,7 +106,7 @@ async function safeWriteConfig(content: string): Promise<void> {
 function decryptConfig(config: AppConfig): AppConfig {
   const result = { ...config }
 
-  // Astra Clash: no keychain. Values are plain text; old encrypted ones cannot be read and are cleared.
+  // Noctur: no keychain. Values are plain text; old encrypted ones cannot be read and are cleared.
   if (!FORK.keychain) {
     for (const field of ENCRYPTED_FIELDS) {
       const value = result[field]

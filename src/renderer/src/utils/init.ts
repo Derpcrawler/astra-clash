@@ -1,4 +1,5 @@
 import { getVersion } from './ipc'
+import { dropIconCacheOnUpdate } from '@renderer/noctur/icon-cache'
 // const originError = console.error
 // const originWarn = console.warn
 // console.error = function (...args: any[]): void {
@@ -19,4 +20,9 @@ export let version: string = ''
 
 export async function init(): Promise<void> {
   version = await getVersion()
+  try {
+    dropIconCacheOnUpdate(localStorage, version)
+  } catch {
+    // storage unavailable: icons are fetched as before
+  }
 }

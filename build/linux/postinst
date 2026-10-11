@@ -1,32 +1,32 @@
 #!/bin/bash
-# Astra Clash: runs after install, and after upgrade on every package type (deb and rpm call it on
+# Noctur: runs after install, and after upgrade on every package type (deb and rpm call it on
 # upgrades too; pacman gets it as post_upgrade through electron-builder.yml). Based on
 # electron-builder's after-install template with the paths written out, so the same file works
 # where electron-builder does not fill in its macros. Every step can run again safely.
 
 if type update-alternatives >/dev/null 2>&1; then
     # Remove previous link if it doesn't use update-alternatives
-    if [ -L '/usr/bin/astra-clash' -a -e '/usr/bin/astra-clash' -a "`readlink '/usr/bin/astra-clash'`" != '/etc/alternatives/astra-clash' ]; then
-        rm -f '/usr/bin/astra-clash'
+    if [ -L '/usr/bin/noctur' -a -e '/usr/bin/noctur' -a "`readlink '/usr/bin/noctur'`" != '/etc/alternatives/noctur' ]; then
+        rm -f '/usr/bin/noctur'
     fi
-    update-alternatives --install '/usr/bin/astra-clash' 'astra-clash' '/opt/Astra Clash/astra-clash' 100 || ln -sf '/opt/Astra Clash/astra-clash' '/usr/bin/astra-clash'
+    update-alternatives --install '/usr/bin/noctur' 'noctur' '/opt/Noctur/noctur' 100 || ln -sf '/opt/Noctur/noctur' '/usr/bin/noctur'
 else
-    ln -sf '/opt/Astra Clash/astra-clash' '/usr/bin/astra-clash'
+    ln -sf '/opt/Noctur/noctur' '/usr/bin/noctur'
 fi
 
 # Check if user namespaces are supported by the kernel and working with a quick test:
 if ! { [[ -L /proc/self/ns/user ]] && unshare --user true; }; then
     # Use SUID chrome-sandbox only on systems without user namespaces:
-    chmod 4755 '/opt/Astra Clash/chrome-sandbox' || true
+    chmod 4755 '/opt/Noctur/chrome-sandbox' || true
 else
-    chmod 0755 '/opt/Astra Clash/chrome-sandbox' || true
+    chmod 0755 '/opt/Noctur/chrome-sandbox' || true
 fi
 
 # TUN mode: the core needs CAP_NET_ADMIN for the TUN device and routes and CAP_NET_BIND_SERVICE for
 # DNS on port 53. File capabilities give it only these; the core runs as the user, not as root.
 # The app can set or remove them later (Settings, Core).
 for core in mihomo mihomo-alpha; do
-    file='/opt/Astra Clash/resources/sidecar/'"$core"
+    file='/opt/Noctur/resources/sidecar/'"$core"
     [ -f "$file" ] || continue
     chown root:root "$file"
     chmod 0755 "$file"
@@ -50,8 +50,8 @@ fi
 # This is in order to keep backwards compatibility with Ubuntu 22.04 which does not support abi/4.0.
 # In that case, we just skip installing the profile since the app runs fine without it on 22.04.
 if apparmor_status --enabled > /dev/null 2>&1; then
-  APPARMOR_PROFILE_SOURCE='/opt/Astra Clash/resources/apparmor-profile'
-  APPARMOR_PROFILE_TARGET='/etc/apparmor.d/astra-clash'
+  APPARMOR_PROFILE_SOURCE='/opt/Noctur/resources/apparmor-profile'
+  APPARMOR_PROFILE_TARGET='/etc/apparmor.d/noctur'
   if apparmor_parser --skip-kernel-load --debug "$APPARMOR_PROFILE_SOURCE" > /dev/null 2>&1; then
     cp -f "$APPARMOR_PROFILE_SOURCE" "$APPARMOR_PROFILE_TARGET"
 

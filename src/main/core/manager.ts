@@ -2,7 +2,7 @@ import { DEFAULT_STOP_TIMINGS, isChildRunning, killChildNow, stopChildProcess } 
 import { StartupWatch, watchStartup } from './startup-watch'
 import { ProviderTracker, ProviderWait, ProviderWaitCancelled } from './provider-tracker'
 import { isShuttingDown } from '../sys/shutdown'
-import { hasCoreCapsSync, isPkexecCancel, readCapsState, setCoreCaps } from '../astra/core-caps'
+import { hasCoreCapsSync, isPkexecCancel, readCapsState, setCoreCaps } from '../noctur/core-caps'
 import { ChildProcess, execFile, execFileSync, spawn } from 'child_process'
 import {
   dataDir,
@@ -83,7 +83,7 @@ const normalize = (s: string): string =>
     .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
     .normalize('NFC')
 
-// Astra Clash: limits for core startup. Exported so tests can shorten them.
+// Noctur: limits for core startup. Exported so tests can shorten them.
 export const STARTUP_LIMITS = {
   /** Wait for the controller line before asking the API instead. */
   controllerMs: 30_000,
@@ -93,7 +93,7 @@ export const STARTUP_LIMITS = {
   apiTries: 30
 }
 
-// Astra Clash: provider start tracking for core starts and hot reloads (core/provider-tracker.ts).
+// Noctur: provider start tracking for core starts and hot reloads (core/provider-tracker.ts).
 async function waitForApi(): Promise<void> {
   for (let i = 0; i < STARTUP_LIMITS.apiTries; i++) {
     try {
@@ -192,7 +192,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
     SAFE_PATHS: safePaths.join(path.delimiter),
     PATH: process.env.PATH
   }
-  // Astra Clash: no new core once a quit is accepted (sys/shutdown.ts). Checked right before the
+  // Noctur: no new core once a quit is accepted (sys/shutdown.ts). Checked right before the
   // spawn with no await in between, so a restart that was already under way cannot start a core
   // behind a shutdown that began during its earlier steps.
   if (isShuttingDown()) throw new ShutdownInProgress()
@@ -233,7 +233,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   })
   child.stdout?.pipe(stdout)
   child.stderr?.pipe(stderr)
-  // Astra Clash: startup log read line by line from the first byte (core/startup-watch.ts); later
+  // Noctur: startup log read line by line from the first byte (core/startup-watch.ts); later
   // lines feed provider tracking.
   const watch = watchStartup(child, {
     platform: process.platform,
@@ -280,10 +280,10 @@ export async function stopCore(force = false): Promise<void> {
   stopMihomoLogs()
   stopMihomoMemory()
 
-  // Astra Clash: whether the core still runs comes from its exit status (core/child-process.ts),
+  // Noctur: whether the core still runs comes from its exit status (core/child-process.ts),
   // not ChildProcess.killed, which turns true as soon as SIGINT is sent. The core gets SIGINT
   // before the DNS restore, which has no time limit of its own: a quit that runs out of time then
-  // meets a core that already had its chance to stop (astra/shutdown-sequence.ts).
+  // meets a core that already had its chance to stop (noctur/shutdown-sequence.ts).
   currentWatch?.stop()
   currentWatch = null
   providerTracker.cancelAll()
@@ -331,7 +331,7 @@ export async function stopCore(force = false): Promise<void> {
   }
 }
 
-// Astra Clash: the quit's last step before every exit (astra/shutdown-sequence.ts): SIGKILL for the
+// Noctur: the quit's last step before every exit (noctur/shutdown-sequence.ts): SIGKILL for the
 // tracked core if it is still running, a no-op after a clean stop.
 export function forceKillCore(): Promise<void> {
   return child && isChildRunning(child) ? killChildNow(child) : Promise.resolve()
@@ -347,7 +347,7 @@ export class ShutdownInProgress extends Error {
   }
 }
 
-// Astra Clash: restarts run one at a time: each stops the core and starts the next before the
+// Noctur: restarts run one at a time: each stops the core and starts the next before the
 // following restart begins, so two quick restarts cannot both start a core. The wait for the new
 // core's providers happens outside the queue; when a later restart stops that core first, the
 // cancelled wait ends quietly instead of showing an error.
@@ -426,7 +426,7 @@ export async function manualGrantCorePermition(
 ): Promise<void> {
   const execFilePromise = promisify(execFile)
 
-  // Astra Clash: Linux grants file capabilities, not setuid root (astra/core-caps.ts).
+  // Noctur: Linux grants file capabilities, not setuid root (noctur/core-caps.ts).
   if (process.platform === 'linux') {
     const targets = (cores || ['mihomo', 'mihomo-alpha']).map((c) => mihomoCorePath(c))
     try {
@@ -472,7 +472,7 @@ export function checkCorePermissionSync(coreName: 'mihomo' | 'mihomo-alpha'): bo
   }
 }
 
-// Astra Clash: on Linux 'partial' means some capability is set but TUN would not work; the dialog
+// Noctur: on Linux 'partial' means some capability is set but TUN would not work; the dialog
 // shows it so the rest can be removed or completed.
 type CorePermission = boolean | 'partial'
 
@@ -508,7 +508,7 @@ export async function checkCorePermission(): Promise<{ mihomo: CorePermission; '
 export async function revokeCorePermission(cores?: ('mihomo' | 'mihomo-alpha')[]): Promise<void> {
   const execFilePromise = promisify(execFile)
 
-  // Astra Clash: Linux removes any file capability a core has, complete or not (astra/core-caps.ts),
+  // Noctur: Linux removes any file capability a core has, complete or not (noctur/core-caps.ts),
   // then checks that none is left. setcap -r fails on a file without capabilities, so only cores
   // that have some are passed; a core whose capabilities cannot be read stops the revoke.
   if (process.platform === 'linux') {
@@ -645,7 +645,7 @@ export async function startNetworkDetection(): Promise<void> {
   networkDetectionTimer = setInterval(async () => {
     if (isAnyNetworkInterfaceUp(extendedBypass) && net.isOnline()) {
       if ((networkDownHandled && !child) || (child && !isChildRunning(child))) {
-        // Astra Clash: a failed or cancelled start here is logged, not left unhandled.
+        // Noctur: a failed or cancelled start here is logged, not left unhandled.
         try {
           const promises = await startCore()
           await Promise.all(promises)

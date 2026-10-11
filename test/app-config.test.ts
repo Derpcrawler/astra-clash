@@ -21,7 +21,7 @@ const onDisk = (f: string): Record<string, unknown> => parseYaml(readFileSync(f,
 let dir: string
 let oldUmask: number
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'astra-config-'))
+  dir = mkdtempSync(join(tmpdir(), 'noctur-config-'))
   paths.config = join(dir, 'config.yaml')
   oldUmask = process.umask(0o022)
 })

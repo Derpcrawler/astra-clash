@@ -32,7 +32,7 @@ vi.mock('../src/main/core/mihomoApi', () => ({
   }
 }))
 vi.mock('../src/main/utils/dirs', () => ({
-  logPath: () => join(tmpdir(), 'astra-resume-test.log'),
+  logPath: () => join(tmpdir(), 'noctur-resume-test.log'),
   servicePath: () => '/nonexistent'
 }))
 vi.mock('../src/main/service/api', () => ({

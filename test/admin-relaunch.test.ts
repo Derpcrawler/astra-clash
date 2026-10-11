@@ -3,7 +3,7 @@
 // would then hand over to the old copy and quit, leaving nothing running).
 import { describe, expect, it } from 'vitest'
 import { spawn } from 'child_process'
-import { waitForPidExit } from '../src/main/astra/admin-relaunch'
+import { waitForPidExit } from '../src/main/noctur/admin-relaunch'
 
 // A process that is not this test's child: sh starts sleep in the background and exits, so sleep
 // is reaped by the system when it ends (a child of this test would stay a zombie while the test

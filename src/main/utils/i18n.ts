@@ -28,6 +28,7 @@ const zhCN: LocaleTranslations = {
     outboundMode: '出站模式',
     connection: '连接方式',
     tun: 'TUN',
+    proxyNeedsPort: '系统代理需要混合端口：请在设置中设置一个端口。',
     sysProxy: '系统代理',
     rule: '规则',
     global: '全局',
@@ -44,7 +45,7 @@ const zhCN: LocaleTranslations = {
     copyEnvVariables: '复制环境变量',
     quitKeepCore: '保留内核退出',
     restartApp: '重启应用',
-    quitApp: '退出 Astra Clash',
+    quitApp: '退出 Noctur',
     retest: '重新测试',
     controllerListenError: '控制器监听错误',
     tunStartFailed: '虚拟网卡启动失败，前往内核设置页尝试手动授予内核权限'
@@ -54,13 +55,13 @@ const zhCN: LocaleTranslations = {
     showLogs: '在访达中显示日志',
     showAppData: '在访达中显示应用数据',
     about: '关于',
-    aboutApp: '关于 Astra Clash',
+    aboutApp: '关于 Noctur',
     hide: '隐藏',
     hideOthers: '隐藏其他',
     showAll: '显示全部',
     quitKeepCore: '保留内核退出',
     restartApp: '重启应用',
-    quitApp: '退出 Astra Clash',
+    quitApp: '退出 Noctur',
     edit: '编辑',
     undo: '撤销',
     redo: '重做',
@@ -89,6 +90,8 @@ const zhCN: LocaleTranslations = {
     ok: '确定'
   },
   notification: {
+    astraMoveTitle: '尚未移动 Astra Clash 的数据',
+    astraMoveBody: '本次启动使用旧文件夹中的设置和配置文件。下次启动时会再次尝试移动。',
     sysProxyEnabled: '系统代理已开启',
     sysProxyDisabled: '系统代理已关闭',
     tunEnabled: '虚拟网卡已开启',
@@ -147,7 +150,7 @@ const zhCN: LocaleTranslations = {
     downloadCancelled: '下载已取消',
     downloadFailed: '下载失败',
     userCancelledDownload: '用户取消下载',
-    scriptReturnMustBeObject: '脚本返回值必须是对象',
+    scriptReturnMustBeObject: '脚本返回值必须是对象'
   },
   ui: {
     defaultTheme: '默认',
@@ -173,6 +176,7 @@ const enUS: LocaleTranslations = {
     outboundMode: 'Outbound Mode',
     connection: 'Connection',
     tun: 'TUN',
+    proxyNeedsPort: 'System Proxy needs a mixed port. Set one in Settings.',
     sysProxy: 'System Proxy',
     rule: 'Rule',
     global: 'Global',
@@ -189,7 +193,7 @@ const enUS: LocaleTranslations = {
     copyEnvVariables: 'Copy Environment Variables',
     quitKeepCore: 'Quit Keep Core',
     restartApp: 'Restart App',
-    quitApp: 'Quit Astra Clash',
+    quitApp: 'Quit Noctur',
     retest: 'Retest',
     controllerListenError: 'Controller listen error',
     tunStartFailed:
@@ -200,13 +204,13 @@ const enUS: LocaleTranslations = {
     showLogs: 'Show Logs in Finder',
     showAppData: 'Show App Data in Finder',
     about: 'About',
-    aboutApp: 'About Astra Clash',
+    aboutApp: 'About Noctur',
     hide: 'Hide',
     hideOthers: 'Hide Others',
     showAll: 'Show All',
     quitKeepCore: 'Quit Keep Core',
     restartApp: 'Restart App',
-    quitApp: 'Quit Astra Clash',
+    quitApp: 'Quit Noctur',
     edit: 'Edit',
     undo: 'Undo',
     redo: 'Redo',
@@ -235,6 +239,9 @@ const enUS: LocaleTranslations = {
     ok: 'OK'
   },
   notification: {
+    astraMoveTitle: 'Your Astra Clash data has not moved yet',
+    astraMoveBody:
+      'Noctur is using your settings and profiles from the old folder for now and will try again next time it starts.',
     sysProxyEnabled: 'System Proxy Enabled',
     sysProxyDisabled: 'System Proxy Disabled',
     tunEnabled: 'Virtual Network Interface Enabled',
@@ -242,7 +249,7 @@ const enUS: LocaleTranslations = {
     switchedToRuleMode: 'Switched to Rule Mode',
     switchedToGlobalMode: 'Switched to Global Mode',
     switchedToDirectMode: 'Switched to Direct Mode',
-    profileImportSuccess: 'Profile imported successfully',
+    profileImportSuccess: 'Profile imported successfully'
   },
   dialog: {
     firstRunAdmin: 'Please run as administrator for the first time',
@@ -293,7 +300,7 @@ const enUS: LocaleTranslations = {
     downloadCancelled: 'Download cancelled',
     downloadFailed: 'Download failed',
     userCancelledDownload: 'User cancelled download',
-    scriptReturnMustBeObject: 'Script return value must be an object',
+    scriptReturnMustBeObject: 'Script return value must be an object'
   },
   ui: {
     defaultTheme: 'Default',
@@ -319,6 +326,7 @@ const ruRU: LocaleTranslations = {
     outboundMode: 'Режим маршрутизации',
     connection: 'Подключение',
     tun: 'TUN',
+    proxyNeedsPort: 'Системному прокси нужен смешанный порт. Укажите его в настройках.',
     sysProxy: 'Системный прокси',
     rule: 'Правило',
     global: 'Глобальный',
@@ -335,7 +343,7 @@ const ruRU: LocaleTranslations = {
     copyEnvVariables: 'Копировать переменные окружения',
     quitKeepCore: 'Выйти, сохранив ядро',
     restartApp: 'Перезапустить приложение',
-    quitApp: 'Выйти из Astra Clash',
+    quitApp: 'Выйти из Noctur',
     retest: 'Повторить тест',
     controllerListenError: 'Ошибка прослушивания контроллера',
     tunStartFailed:
@@ -346,13 +354,13 @@ const ruRU: LocaleTranslations = {
     showLogs: 'Показать журналы в Finder',
     showAppData: 'Показать данные приложения в Finder',
     about: 'О программе',
-    aboutApp: 'О Astra Clash',
+    aboutApp: 'О Noctur',
     hide: 'Скрыть',
     hideOthers: 'Скрыть остальные',
     showAll: 'Показать все',
     quitKeepCore: 'Выйти, сохранив ядро',
     restartApp: 'Перезапустить приложение',
-    quitApp: 'Выйти из Astra Clash',
+    quitApp: 'Выйти из Noctur',
     edit: 'Правка',
     undo: 'Отменить',
     redo: 'Повторить',
@@ -381,6 +389,9 @@ const ruRU: LocaleTranslations = {
     ok: 'ОК'
   },
   notification: {
+    astraMoveTitle: 'Данные Astra Clash ещё не перенесены',
+    astraMoveBody:
+      'Сейчас Noctur использует настройки и профили из старой папки и попробует перенести их при следующем запуске.',
     sysProxyEnabled: 'Системный прокси включён',
     sysProxyDisabled: 'Системный прокси отключён',
     tunEnabled: 'Режим TUN включён',
@@ -458,6 +469,20 @@ const locales: { [key: string]: LocaleTranslations } = {
 }
 
 let currentLanguage = 'ru-RU'
+
+/**
+ * Noctur: the language at startup, before the window loads (the menu bar menu, notifications and
+ * dialogs used Russian until then). The one saved from the window, else the system's first
+ * preferred language with the window's rules (i18n.ts in the renderer).
+ */
+export function pickLanguage(saved: string | undefined, system: string[]): string {
+  if (saved && locales[saved]) return saved
+  const lang = system[0] ?? ''
+  if (lang.startsWith('zh')) return 'zh-CN'
+  if (lang.startsWith('ru')) return 'ru-RU'
+  if (lang.startsWith('en')) return 'en-US'
+  return 'ru-RU'
+}
 
 export function setLanguage(lang: string): void {
   if (locales[lang]) {

@@ -10,14 +10,11 @@ import {
   mihomoVersion,
   quitApp,
   quitWithoutCore,
-  resetAppConfig,
-  cancelUpdate
+  resetAppConfig
 } from '@renderer/utils/ipc'
 import { useState, useRef } from 'react'
-import useSWR from 'swr'
-import { useUpdaterStore } from '@renderer/store/updater-store'
-import { useShallow } from 'zustand/react/shallow'
-import UpdaterModal from '../updater/updater-modal'
+import useSWR, { mutate } from 'swr'
+import { UPDATE_KEY } from '@renderer/noctur/update-line'
 import { version } from '@renderer/utils/init'
 import { startTour } from '@renderer/utils/driver'
 import { useNavigate } from 'react-router-dom'
@@ -37,25 +34,9 @@ const Actions: React.FC<ActionsProps> = (props) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { data: coreVersion } = useSWR('mihomoVersion', mihomoVersion)
-  const [newVersion, setNewVersion] = useState('')
-  const [changelog, setChangelog] = useState('')
-  const [openUpdate, setOpenUpdate] = useState(false)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const versionTapCountRef = useRef(0)
-  const updateStatus = useUpdaterStore(
-    useShallow((s) => ({ downloading: s.downloading, progress: s.progress, error: s.error }))
-  )
-  const resetUpdateStatus = useUpdaterStore((s) => s.reset)
-
-  const handleCancelUpdate = async (): Promise<void> => {
-    try {
-      await cancelUpdate()
-      resetUpdateStatus()
-    } catch (e) {
-      // ignore
-    }
-  }
 
   const handleVersionClick = (): void => {
     if (showHiddenSettings) return
@@ -67,15 +48,6 @@ const Actions: React.FC<ActionsProps> = (props) => {
 
   return (
     <>
-      {openUpdate && (
-        <UpdaterModal
-          onClose={() => setOpenUpdate(false)}
-          version={newVersion}
-          changelog={changelog}
-          updateStatus={updateStatus}
-          onCancel={handleCancelUpdate}
-        />
-      )}
       {confirmOpen && (
         <ConfirmModal
           onChange={setConfirmOpen}
@@ -103,7 +75,7 @@ const Actions: React.FC<ActionsProps> = (props) => {
             {t('settings.actions.openGuide')}
           </Button>
         </SettingItem>
-        {FORK.selfUpdate && (
+        {/* Noctur: a newer version shows as the update line on Home (noctur/update-line.tsx). */}
         <SettingItem title={t('settings.actions.checkUpdate')} divider>
           <Button
             size="sm"
@@ -111,16 +83,15 @@ const Actions: React.FC<ActionsProps> = (props) => {
             onClick={async () => {
               try {
                 setCheckingUpdate(true)
-                const version = await checkUpdate()
-                if (version) {
-                  setNewVersion(version.version)
-                  setChangelog(version.changelog)
-                  setOpenUpdate(true)
+                const latest = await checkUpdate()
+                await mutate(UPDATE_KEY, latest, { revalidate: false })
+                if (latest) {
+                  toast.success(t('noctur.update.availableToast', { version: latest.version }))
                 } else {
-                  toast.success(t('settings.actions.noNeedUpdate'))
+                  toast.success(t('noctur.update.upToDate', { version }))
                 }
-              } catch (e) {
-                toast.error(`${e}`)
+              } catch {
+                toast.error(t('noctur.update.checkFailed'))
               } finally {
                 setCheckingUpdate(false)
               }
@@ -129,7 +100,6 @@ const Actions: React.FC<ActionsProps> = (props) => {
             {t('settings.actions.checkUpdate')}
           </Button>
         </SettingItem>
-        )}
         <SettingItem
           title={t('settings.actions.resetApp')}
           actions={
@@ -189,24 +159,24 @@ const Actions: React.FC<ActionsProps> = (props) => {
           </SettingItem>
         )}
         {FORK.keepCore && (
-        <SettingItem
-          title={t('settings.actions.quitKeepCore')}
-          actions={
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon-sm" variant="ghost">
-                  <MessageCircleQuestionMark className="text-lg" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t('settings.actions.quitKeepCoreHelp')}</TooltipContent>
-            </Tooltip>
-          }
-          divider
-        >
-          <Button size="sm" onClick={quitWithoutCore}>
-            {t('common.quit')}
-          </Button>
-        </SettingItem>
+          <SettingItem
+            title={t('settings.actions.quitKeepCore')}
+            actions={
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon-sm" variant="ghost">
+                    <MessageCircleQuestionMark className="text-lg" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('settings.actions.quitKeepCoreHelp')}</TooltipContent>
+              </Tooltip>
+            }
+            divider
+          >
+            <Button size="sm" onClick={quitWithoutCore}>
+              {t('common.quit')}
+            </Button>
+          </SettingItem>
         )}
         <SettingItem title={t('settings.actions.quitApp')} divider>
           <Button size="sm" onClick={quitApp}>
@@ -227,10 +197,10 @@ const Actions: React.FC<ActionsProps> = (props) => {
           }
           divider
         >
-          <div className="astra-value">{coreVersion?.version ? coreVersion.version : '...'}</div>
+          <div className="noctur-value">{coreVersion?.version ? coreVersion.version : '...'}</div>
         </SettingItem>
         <SettingItem title={t('settings.actions.appVersion')}>
-          <button type="button" className="select-none astra-value" onClick={handleVersionClick}>
+          <button type="button" className="select-none noctur-value" onClick={handleVersionClick}>
             v{version}
           </button>
         </SettingItem>

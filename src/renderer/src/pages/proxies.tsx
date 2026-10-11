@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso'
 
-// Astra Clash: the list pins a copy of the top group's card while scrolling but never moves it, so
+// Noctur: the list pins a copy of the top group's card while scrolling but never moves it, so
 // the next card slid over it. This pushes the copy up by the overlap with the next card, like
 // section headers in native lists: a closed group scrolls away normally, an open group's card
 // stays until the next group reaches it.
@@ -431,7 +431,7 @@ const Proxies: React.FC = () => {
                       )}
                     </div>
                     {showMeta && (
-                      <span className="flag-emoji text-xs text-muted-foreground truncate leading-tight">
+                      <span className="flag-emoji text-xs text-(--noctur-fg2) truncate leading-tight">
                         {group.now}
                       </span>
                     )}
@@ -602,8 +602,8 @@ const Proxies: React.FC = () => {
             groupCounts={groupCounts}
             groupContent={groupContent}
             scrollerRef={(el) => {
-              if (!(el instanceof HTMLElement) || el.dataset.astraPush) return
-              el.dataset.astraPush = '1'
+              if (!(el instanceof HTMLElement) || el.dataset.nocturPush) return
+              el.dataset.nocturPush = '1'
               // After the list has re-rendered for this scroll position.
               el.addEventListener('scroll', () => requestAnimationFrame(() => pushTopGroup(el)), {
                 passive: true

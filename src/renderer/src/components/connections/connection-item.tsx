@@ -118,7 +118,7 @@ const ConnectionItemComponent: React.FC<Props> = ({
                 <img src={iconUrl} alt="" className="size-12 shrink-0" />
               ) : (
                 <div className="size-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <span className="text-xs font-semibold text-muted-foreground">
+                  <span className="text-xs font-semibold text-(--noctur-fg2)">
                     {(processName || '').slice(0, 2).toUpperCase()}
                   </span>
                 </div>
@@ -132,7 +132,7 @@ const ConnectionItemComponent: React.FC<Props> = ({
                   {primaryLabel}
                 </span>
               </div>
-              <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+              <span className="text-[11px] text-(--noctur-fg2) whitespace-nowrap shrink-0">
                 {timeAgo}
               </span>
               <Button
@@ -148,22 +148,22 @@ const ConnectionItemComponent: React.FC<Props> = ({
               </Button>
             </div>
             <div className="flex items-center gap-1.5 pb-1">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-(--noctur-fg2)">
                 {info.metadata.type}({info.metadata.network.toUpperCase()})
               </span>
               <span className="text-xs text-muted-foreground/40">|</span>
-              <span className="flag-emoji text-xs text-muted-foreground truncate">
+              <span className="flag-emoji text-xs text-(--noctur-fg2) truncate">
                 {info.chains[0]}
               </span>
               <span className="text-xs text-muted-foreground/40">|</span>
-              <span className="text-xs text-muted-foreground tabular-nums">
+              <span className="text-xs text-(--noctur-fg2) tabular-nums">
                 ↑ {uploadTraffic} ↓ {downloadTraffic}
               </span>
               {hasSpeed && (
                 <>
                   <span className="text-xs text-muted-foreground/40">|</span>
                   <span
-                    className={`text-xs tabular-nums ${info.isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                    className={`text-xs tabular-nums ${info.isActive ? 'text-primary' : 'text-(--noctur-fg2)'}`}
                   >
                     ↑ {uploadSpeed || '0 B'}/s ↓ {downloadSpeed || '0 B'}/s
                   </span>

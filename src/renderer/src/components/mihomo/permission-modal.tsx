@@ -31,7 +31,7 @@ interface Props {
 const PermissionModal: React.FC<Props> = (props) => {
   const { onChange, onRevoke, onGrant } = props
   const [loading, setLoading] = useState<{ mihomo?: boolean; 'mihomo-alpha'?: boolean }>({})
-  // Astra Clash: 'partial' (Linux) is some capability set without what TUN needs; it offers Revoke.
+  // Noctur: 'partial' (Linux) is some capability set without what TUN needs; it offers Revoke.
   const [hasPermission, setHasPermission] = useState<
     { mihomo: boolean | 'partial'; 'mihomo-alpha': boolean | 'partial' } | boolean | null
   >(null)

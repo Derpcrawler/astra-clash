@@ -1,6 +1,6 @@
 import { ChildProcess } from 'child_process'
 
-// Astra Clash: stopping the core process. Node sets ChildProcess.killed as soon as a signal is sent,
+// Noctur: stopping the core process. Node sets ChildProcess.killed as soon as a signal is sent,
 // not when the process exits, so it cannot tell whether the core is still running. These helpers
 // look at the exit status instead.
 

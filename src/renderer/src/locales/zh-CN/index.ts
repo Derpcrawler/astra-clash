@@ -1,6 +1,9 @@
 export default {
-  astra: {
-    about: { credits: 'Astra Clash 是 coolcoala 的 Koala Clash 的修改版本，Koala Clash 基于 xishang0128 的 Sparkle 和 pompurin404 的 Mihomo Party。依据 GPL-3.0 许可证发布。' },
+  noctur: {
+    about: {
+      credits:
+        'Noctur 是 coolcoala 的 Koala Clash 的修改版本，Koala Clash 基于 xishang0128 的 Sparkle 和 pompurin404 的 Mihomo Party。依据 GPL-3.0 许可证发布。'
+    },
     palettes: { more: '更多', less: '收起' },
     profile: { every: '每 {{interval}}' },
     picker: { test: '测试延迟', auto: '此代理组会自动选择节点。', all: '全部代理组' },
@@ -18,9 +21,66 @@ export default {
       remove: '删除',
       note: '内核从 GitHub 上的 MetaCubeX 下载，并按 GitHub 公布的 SHA-256 校验。每个内核需要输入一次密码，以便运行 TUN。'
     },
+    look: {
+      title: '风格',
+      noctur: 'Noctur',
+      calm: '静谧',
+      nocturDesc: '连接时月亮边缘升起太阳，背景中光晕与星辰缓缓漂移。',
+      calmDesc: '静止天空下的简洁电源开关。除非你操作，一切保持静止。',
+      welcome: '欢迎使用 Noctur',
+      pick: '先选择一种风格，之后可随时在设置中更改。',
+      continue: '继续'
+    },
+    update: {
+      available: 'Noctur 有新版本：',
+      whatsNew: '新功能',
+      update: '更新 Noctur',
+      download: '下载',
+      downloading: '正在下载 Noctur {{version}}',
+      cancel: '取消',
+      installing: '正在安装 Noctur {{version}}…',
+      restarting: '已安装，正在重启 Noctur…',
+      confirmMac: '请在系统窗口中确认以安装 Noctur {{version}}',
+      closingWin: 'Noctur 将关闭，安装 {{version}} 后重新打开',
+      failedDownload: '无法下载 Noctur {{version}}。',
+      failedInstall: '无法安装 Noctur {{version}}。',
+      tryAgain: '重试',
+      fromGitHub: '从 GitHub 下载',
+      notesTitle: 'Noctur {{version}} 新功能',
+      onGitHub: '在 GitHub 上打开',
+      upToDate: 'Noctur 已是最新版本（{{version}}）',
+      availableToast: 'Noctur {{version}} 可用，可在首页更新。',
+      settingCheck: '检查新版本',
+      checkFailed: '无法检查更新，请稍后再试。'
+    },
     appearance: { starField: '星空背景', connectJump: '连接动画' },
-    settings: { connection: '连接', general: '通用', appearance: '外观', advanced: '高级', shortcuts: '快捷键', about: '关于' },
-    nav: { home: '首页', proxies: '代理组', profiles: '订阅', connections: '连接', rules: '规则', logs: '日志', settings: '设置' },
+    settings: {
+      connection: '连接',
+      general: '通用',
+      appearance: '外观',
+      advanced: '高级',
+      shortcuts: '快捷键',
+      about: '关于'
+    },
+    nav: {
+      home: '首页',
+      proxies: '代理组',
+      profiles: '订阅',
+      connections: '连接',
+      rules: '规则',
+      logs: '日志',
+      settings: '设置'
+    },
+    home: {
+      through: '经由 {{node}}，已连接',
+      ready: '可使用 {{profile}} 连接',
+      connect: '连接',
+      disconnect: '断开',
+      used: '已用 {{used}} / {{total}}',
+      method: '连接方式',
+      tunHint: '所有应用',
+      proxyHint: '支持代理的应用'
+    },
     rule: '规则',
     global: '全局',
     connected: '已连接',
@@ -152,7 +212,7 @@ export default {
     sidebarHomeDesc: '点击侧边栏中的首页图标，返回首页并完成教程。',
     supportTitle: '技术支持',
     supportDesc: '点击这里可以联系服务提供方支持。',
-    welcome: '欢迎使用 Astra Clash',
+    welcome: '欢迎使用 Noctur',
     welcomeDesc:
       '这是一份交互式使用教程，如果您已经完全熟悉本软件的操作，可以直接点击右上角关闭按钮，后续您可以随时从设置中打开本教程',
     navbar: '导航栏',
@@ -167,7 +227,7 @@ export default {
       '订阅管理卡片展示当前运行的订阅配置信息，点击进入订阅管理页面可以在这里管理订阅配置',
     profileImport: '订阅导入',
     profileImportDesc:
-      'Astra Clash 支持多种订阅导入方式，在此输入订阅链接，点击导入即可导入您的订阅配置，如果您的订阅需要代理才能更新，请勾选"代理"再点击导入，当然这需要已经有一个可以正常使用的订阅才可以',
+      'Noctur 支持多种订阅导入方式，在此输入订阅链接，点击导入即可导入您的订阅配置，如果您的订阅需要代理才能更新，请勾选"代理"再点击导入，当然这需要已经有一个可以正常使用的订阅才可以',
     localProfile: '本地订阅',
     localProfileDesc: '点击"+"可以选择本地文件进行导入或者直接新建空白配置进行编辑',
     sysProxy: '系统代理',
@@ -181,7 +241,7 @@ export default {
       '虚拟网卡，即同类软件中常见的"Tun 模式"，对于某些不遵循系统代理的应用，您可以打开虚拟网卡以让内核接管所有流量',
     tunSettings: '虚拟网卡设置',
     tunSettingsDesc:
-      '这里可以更改虚拟网卡相关设置，Astra Clash 理论上已经完全解决权限问题，如果您的虚拟网卡仍然不可用，可以尝试重设防火墙（Windows）或手动授权内核（MacOS/Linux）后重启内核',
+      '这里可以更改虚拟网卡相关设置，Noctur 理论上已经完全解决权限问题，如果您的虚拟网卡仍然不可用，可以尝试重设防火墙（Windows）或手动授权内核（MacOS/Linux）后重启内核',
     dnsDesc:
       '软件默认接管了内核的 DNS 设置，如果您需要使用订阅配置中的 DNS 设置，可以到应用设置中关闭"接管 DNS 设置"，域名嗅探同理',
     tutorialEnd: '教程结束',
@@ -517,7 +577,7 @@ export default {
     pleaseConfirm: '请确认',
     confirmDelete: '确认删除',
     confirmImportProfile: '确定要导入订阅配置吗？',
-    confirmQuit: '确定要退出 Astra Clash 吗？',
+    confirmQuit: '确定要退出 Noctur 吗？',
     quitWarning: '退出后代理功能将停止工作',
     quickQuitHint: '快按两次或长按',
     canQuitDirectly: '可直接退出',
@@ -750,7 +810,7 @@ export default {
       registerTaskSchedule: '注册计划'
     },
     serviceModal: {
-      title: 'Astra Clash 服务管理',
+      title: 'Noctur 服务管理',
       serviceStatus: '服务状态',
       connectionStatus: '连接状态',
       checking: '检查中',

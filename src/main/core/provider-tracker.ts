@@ -1,4 +1,4 @@
-// Astra Clash: waiting for the core's providers to start, after a core start and after every hot
+// Noctur: waiting for the core's providers to start, after a core start and after every hot
 // reload. The core logs "Start initial provider <name>" for each rule and proxy provider (or
 // "Start initial compatible provider default" when there are none).
 //

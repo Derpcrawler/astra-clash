@@ -5,7 +5,7 @@ import { setMainLanguage } from '@renderer/utils/ipc'
 export type Language = 'zh-CN' | 'en-US' | 'ru-RU'
 
 export const LANGUAGES = [
-  // Astra Clash: English, Russian, then Chinese.
+  // Noctur: English, Russian, then Chinese.
   { value: 'en-US' as const, labelKey: 'languages.enUS', nativeLabelKey: 'languages.native.enUS' },
   { value: 'ru-RU' as const, labelKey: 'languages.ruRU', nativeLabelKey: 'languages.native.ruRU' },
   { value: 'zh-CN' as const, labelKey: 'languages.zhCN', nativeLabelKey: 'languages.native.zhCN' }

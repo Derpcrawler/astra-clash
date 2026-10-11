@@ -1,4 +1,3 @@
-import { FORK } from '@renderer/fork'
 import React, { useState } from 'react'
 import { toast } from 'sonner'
 import SettingCard from '../base/base-setting-card'
@@ -24,9 +23,9 @@ const GeneralConfig: React.FC<GeneralConfigProps> = (props) => {
   const { appConfig, patchAppConfig } = useAppConfig()
   const {
     silentStart = false,
-    autoCheckUpdate,
 
-    disableGPU = false
+    disableGPU = false,
+    checkUpdates
   } = appConfig || {}
 
   const [showRestartConfirm, setShowRestartConfirm] = useState(false)
@@ -83,16 +82,16 @@ const GeneralConfig: React.FC<GeneralConfigProps> = (props) => {
             }}
           />
         </SettingItem>
-        {FORK.selfUpdate && (
-        <SettingItem title={t('settings.general.autoCheckUpdate')} divider={showHiddenSettings}>
+        {/* Noctur: on unless turned off (checkUpdates unset counts as on; Astra Clash's
+            autoCheckUpdate was saved as false without ever being shown). */}
+        <SettingItem title={t('noctur.update.settingCheck')} divider={showHiddenSettings}>
           <Switch
-            checked={autoCheckUpdate}
+            checked={checkUpdates !== false}
             onCheckedChange={(value) => {
-              patchAppConfig({ autoCheckUpdate: value })
+              patchAppConfig({ checkUpdates: value })
             }}
           />
         </SettingItem>
-        )}
         {showHiddenSettings && (
           <SettingItem
             title={t('settings.general.disableGPU')}

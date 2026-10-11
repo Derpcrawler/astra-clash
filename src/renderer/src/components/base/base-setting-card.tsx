@@ -6,13 +6,13 @@ interface Props {
   className?: string
 }
 
-// Astra Clash: sections are always open. A title becomes a small heading above the card,
+// Noctur: sections are always open. A title becomes a small heading above the card,
 // instead of the upstream accordion that started collapsed.
 const SettingCard: React.FC<Props> = (props) => {
   return (
-    <section className={`astra-sec ${props.className ?? ''}`}>
-      {props.title && <h3 className="astra-sec-title">{props.title}</h3>}
-      <div className="astra-card astra-rows">{props.children}</div>
+    <section className={`noctur-sec ${props.className ?? ''}`}>
+      {props.title && <h3 className="noctur-sec-title">{props.title}</h3>}
+      <div className="noctur-card noctur-rows">{props.children}</div>
     </section>
   )
 }

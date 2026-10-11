@@ -505,7 +505,7 @@ const Connections: React.FC = () => {
           <img src={selectedProcessIcon} alt="" className="size-6 shrink-0 rounded-md" />
         ) : (
           <div className="size-6 shrink-0 rounded-md bg-muted flex items-center justify-center">
-            <span className="text-[10px] font-semibold leading-none text-muted-foreground">
+            <span className="text-[10px] font-semibold leading-none text-(--noctur-fg2)">
               {selectedProcessName.slice(0, 2).toUpperCase()}
             </span>
           </div>
@@ -524,10 +524,10 @@ const Connections: React.FC = () => {
       header={
         <div className="flex items-center gap-1">
           <div className="flex h-8 items-center gap-1 whitespace-nowrap">
-            <span className="px-1 text-gray-400">
+            <span className="px-1 text-(--noctur-fg2)">
               {'\u2191'} {calcTraffic(info.uploadTotal)}
             </span>
-            <span className="px-1 text-gray-400">
+            <span className="px-1 text-(--noctur-fg2)">
               {'\u2193'} {calcTraffic(info.downloadTotal)}
             </span>
           </div>
@@ -618,7 +618,7 @@ const Connections: React.FC = () => {
           {isProcessListView ? (
             <>
               <div className="flex h-8 items-center">
-                <span className="mr-2 text-sm text-muted-foreground whitespace-nowrap">
+                <span className="mr-2 text-sm text-(--noctur-fg2) whitespace-nowrap">
                   {t('pages.connections.processes')}
                 </span>
                 <Badge variant="default" className="min-w-5 justify-center px-1.5 leading-none">

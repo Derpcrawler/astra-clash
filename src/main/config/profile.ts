@@ -14,7 +14,7 @@ import { parseYaml, stringifyYaml } from '../utils/yaml'
 import { defaultProfile } from '../utils/template'
 import { dirname, join } from 'path'
 import { deepMerge } from '../utils/merge'
-import { getUserAgent } from '../utils/userAgent'
+import { agentHeader, SUBSCRIPTION_AGENTS, SubscriptionAgent } from '../utils/userAgent'
 import { isHttpUrl } from '../utils/url'
 import { getHWID, getDeviceOS, getOSVersion, getDeviceModel } from '../utils/deviceInfo'
 import { t } from '../utils/i18n'
@@ -188,6 +188,125 @@ async function downloadLogoAsBase64(
   }
 }
 
+function requestError(error: unknown, url: string): unknown {
+  if (axios.isAxiosError(error)) {
+    if (error.code === 'ECONNRESET' || error.code === 'ECONNABORTED') {
+      return new Error(`${t('error.networkResetOrTimeout')}：${url}`)
+    } else if (error.code === 'CERT_HAS_EXPIRED') {
+      return new Error(`${t('error.serverCertExpired')}：${url}`)
+    } else if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+      return new Error(`${t('error.unableToVerifyCert')}：${url}`)
+    } else if (error.message.includes('Certificate verification failed')) {
+      return new Error(`${t('error.certVerificationFailed')}：${url}`)
+    } else {
+      return new Error(`${t('error.requestFailed')}：${error.message}`)
+    }
+  }
+  return error
+}
+
+function throwIfHwidLimit(headers: AxiosResponse['headers']): void {
+  const hwidLimitKey = Object.keys(headers).find((k) => k.toLowerCase().endsWith('x-hwid-limit'))
+  const hwidMaxDevicesKey = Object.keys(headers).find((k) =>
+    k.toLowerCase().endsWith('x-hwid-max-devices-reached')
+  )
+  if (
+    (hwidLimitKey && headers[hwidLimitKey] === 'true') ||
+    (hwidMaxDevicesKey && headers[hwidMaxDevicesKey] === 'true')
+  ) {
+    const hwidSupportKey = Object.keys(headers).find((k) =>
+      k.toLowerCase().endsWith('support-url')
+    )
+    const hwidSupportUrl =
+      hwidSupportKey && isHttpUrl(headers[hwidSupportKey]) ? headers[hwidSupportKey] : ''
+    throw new Error(`HWID_LIMIT:${hwidSupportUrl}`)
+  }
+}
+
+/** A mihomo profile has a top-level "proxies" or "proxy-providers" key. */
+function isMihomoProfile(data: unknown): boolean {
+  try {
+    const parsed = parseYaml<MihomoConfig>(String(data))
+    return (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      ('proxies' in parsed || 'proxy-providers' in parsed)
+    )
+  } catch {
+    return false
+  }
+}
+
+// Refusals that another User-Agent will not change: the link is gone, or the server asks to wait.
+const FINAL_4XX = [404, 410, 429]
+
+/**
+ * Downloads a subscription. With a User-Agent of the user's (the app setting or the profile's
+ * own), asks once. Otherwise asks as each name in SUBSCRIPTION_AGENTS, the one saved on the profile
+ * first, and moves to the next when the reply is not a mihomo profile (base64 node links, usually)
+ * or is a 4xx other than 404, 410 and 429. A network error, a 5xx, 404, 410, 429 or the HWID limit
+ * stops at once. Returns the name that got a mihomo profile, so the next update asks as it first.
+ * If none did but one got a 2xx, that first reply is returned without a name, and the format check
+ * in createProfile reports it as before.
+ */
+async function fetchSubscription(
+  url: string,
+  ownUa: string | undefined,
+  preferred: SubscriptionAgent | undefined,
+  proxy: { protocol: string; host: string; port: number } | undefined
+): Promise<{ res: AxiosResponse; agent?: SubscriptionAgent }> {
+  const get = (ua: string): Promise<AxiosResponse> =>
+    axios.get(url, {
+      httpsAgent: new https.Agent(),
+      ...(proxy && { proxy }),
+      headers: {
+        'User-Agent': ua,
+        'x-hwid': getHWID(),
+        'x-device-os': getDeviceOS(),
+        'x-ver-os': getOSVersion(),
+        'x-device-model': getDeviceModel()
+      },
+      responseType: 'text'
+    })
+
+  if (ownUa) {
+    let res: AxiosResponse
+    try {
+      res = await get(ownUa)
+    } catch (e) {
+      throw requestError(e, url)
+    }
+    throwIfHwidLimit(res.headers)
+    return { res }
+  }
+
+  const order =
+    preferred && SUBSCRIPTION_AGENTS.includes(preferred)
+      ? [preferred, ...SUBSCRIPTION_AGENTS.filter((a) => a !== preferred)]
+      : SUBSCRIPTION_AGENTS
+  let notProfile: AxiosResponse | undefined
+  let lastError: unknown
+  for (const agent of order) {
+    let res: AxiosResponse
+    try {
+      res = await get(agentHeader(agent))
+    } catch (e) {
+      const status = axios.isAxiosError(e) ? e.response?.status : undefined
+      if (status !== undefined && status >= 400 && status < 500 && !FINAL_4XX.includes(status)) {
+        lastError = e
+        continue
+      }
+      throw requestError(e, url)
+    }
+    throwIfHwidLimit(res.headers)
+    if (isMihomoProfile(res.data)) return { res, agent }
+    notProfile ??= res
+  }
+  if (notProfile) return { res: notProfile }
+  throw requestError(lastError, url)
+}
+
 export async function createProfile(item: Partial<ProfileItem>): Promise<ProfileItem> {
   const id = item.id || new Date().getTime().toString(16)
   const newItem = {
@@ -206,65 +325,22 @@ export async function createProfile(item: Partial<ProfileItem>): Promise<Profile
     case 'remote': {
       const { 'mixed-port': mixedPort = 0 } = (await getRuntimeConfig()) ?? {}
       if (!item.url) throw new Error('Empty URL')
-      let res: AxiosResponse
-      try {
-        const httpsAgent = new https.Agent()
-
-        res = await axios.get(item.url, {
-          httpsAgent,
-          ...(newItem.useProxy &&
-            mixedPort && {
-              proxy: { protocol: 'http', host: '127.0.0.1', port: mixedPort }
-            }),
-          headers: {
-            'User-Agent': newItem.ua || (await getUserAgent()),
-            'x-hwid': getHWID(),
-            'x-device-os': getDeviceOS(),
-            'x-ver-os': getOSVersion(),
-            'x-device-model': getDeviceModel()
-          },
-          responseType: 'text'
-        })
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          if (error.code === 'ECONNRESET' || error.code === 'ECONNABORTED') {
-            throw new Error(`${t('error.networkResetOrTimeout')}：${item.url}`)
-          } else if (error.code === 'CERT_HAS_EXPIRED') {
-            throw new Error(`${t('error.serverCertExpired')}：${item.url}`)
-          } else if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
-            throw new Error(`${t('error.unableToVerifyCert')}：${item.url}`)
-          } else if (error.message.includes('Certificate verification failed')) {
-            throw new Error(`${t('error.certVerificationFailed')}：${item.url}`)
-          } else {
-            throw new Error(`${t('error.requestFailed')}：${error.message}`)
-          }
-        }
-        throw error
-      }
-
+      const { userAgent } = await getAppConfig()
+      const { res, agent } = await fetchSubscription(
+        item.url,
+        newItem.ua || userAgent,
+        item.agent,
+        newItem.useProxy && mixedPort
+          ? { protocol: 'http', host: '127.0.0.1', port: mixedPort }
+          : undefined
+      )
+      newItem.agent = agent
 
       const data = res.data
       const headers = res.headers
       const contentType = String(headers['content-type'] ?? '').toLowerCase()
       if (contentType.includes('text/html') || contentType.includes('text/xml')) {
         throw new Error(t('error.subscriptionFormatError'))
-      }
-      const hwidLimitKey = Object.keys(headers).find((k) =>
-        k.toLowerCase().endsWith('x-hwid-limit')
-      )
-      const hwidMaxDevicesKey = Object.keys(headers).find((k) =>
-        k.toLowerCase().endsWith('x-hwid-max-devices-reached')
-      )
-      if (
-        (hwidLimitKey && headers[hwidLimitKey] === 'true') ||
-        (hwidMaxDevicesKey && headers[hwidMaxDevicesKey] === 'true')
-      ) {
-        const hwidSupportKey = Object.keys(headers).find((k) =>
-          k.toLowerCase().endsWith('support-url')
-        )
-        const hwidSupportUrl =
-          hwidSupportKey && isHttpUrl(headers[hwidSupportKey]) ? headers[hwidSupportKey] : ''
-        throw new Error(`HWID_LIMIT:${hwidSupportUrl}`)
       }
       const profileTitleKey = Object.keys(headers).find((k) =>
         k.toLowerCase().endsWith('profile-title')

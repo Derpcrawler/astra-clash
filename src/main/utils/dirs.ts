@@ -7,7 +7,7 @@ import { execSync } from 'child_process'
 import { getAppConfigSync } from '../config/app'
 import { checkCorePermissionSync } from '../core/manager'
 import { t } from './i18n'
-import { privateSocketDir } from '../astra/private-dir'
+import { privateSocketDir } from '../noctur/private-dir'
 
 export const homeDir = app.getPath('home')
 
@@ -61,23 +61,23 @@ export function themesDir(): string {
 
 export function mihomoIpcPath(): string {
   if (process.platform === 'win32') {
-    // Astra Clash: own pipe name, so the core does not collide with Koala Clash's on one PC.
-    return '\\\\.\\pipe\\Astra-Clash\\mihomo'
+    // Noctur: own pipe name, so the core does not collide with Koala Clash's on one PC.
+    return '\\\\.\\pipe\\Noctur\\mihomo'
   }
   const { core = 'mihomo' } = getAppConfigSync()
   if (process.platform === 'linux') return linuxIpcPath(core === 'system' ? 'external' : 'api')
   if (core === 'system') {
-    return '/tmp/astra-clash-mihomo-external.sock'
+    return '/tmp/noctur-mihomo-external.sock'
   }
   if (!checkCorePermissionSync(core as 'mihomo' | 'mihomo-alpha')) {
-    return '/tmp/astra-clash-mihomo-api-noperm.sock'
+    return '/tmp/noctur-mihomo-api-noperm.sock'
   }
-  return '/tmp/astra-clash-mihomo-api.sock'
+  return '/tmp/noctur-mihomo-api.sock'
 }
 
-// Astra Clash: on Linux the core runs as the user (with file capabilities, not setuid root), so one
+// Noctur: on Linux the core runs as the user (with file capabilities, not setuid root), so one
 // name per core kind is enough. The socket goes in a folder only this user can open
-// (astra/private-dir.ts): the runtime folder, else one in the data folder, else a short one in the
+// (noctur/private-dir.ts): the runtime folder, else one in the data folder, else a short one in the
 // temp folder when the others are unsuitable or too long. Checked on every call.
 function linuxIpcPath(kind: 'api' | 'external'): string {
   const uid = process.getuid?.() ?? -1
@@ -85,11 +85,11 @@ function linuxIpcPath(kind: 'api' | 'external'): string {
     [
       { dir: process.env.XDG_RUNTIME_DIR, create: false },
       { dir: path.join(dataDir(), 'run'), create: true },
-      { dir: path.join(os.tmpdir(), `astra-clash-${uid}`), create: true }
+      { dir: path.join(os.tmpdir(), `noctur-${uid}`), create: true }
     ],
     uid
   )
-  return path.join(dir, `astra-clash-mihomo-${kind}.sock`)
+  return path.join(dir, `noctur-mihomo-${kind}.sock`)
 }
 
 export function serviceIpcPath(): string {
@@ -103,14 +103,14 @@ export function mihomoCoreDir(): string {
   return path.join(resourcesDir(), 'sidecar')
 }
 
-// Astra Clash: cores downloaded from Settings, Core (astra/core-download.ts). Root-owned folder.
-export const ASTRA_CORE_DIR = '/Library/Application Support/Astra Clash/cores'
+// Noctur: cores downloaded from Settings, Core (noctur/core-download.ts). Root-owned folder.
+export const NOCTUR_CORE_DIR = '/Library/Application Support/Noctur/cores'
 
 export function downloadedCorePath(): string | null {
   if (process.platform !== 'darwin') return null
   const { downloadedCore } = getAppConfigSync()
   if (!downloadedCore || !/^v\d+\.\d+\.\d+$/.test(downloadedCore)) return null
-  const p = path.join(ASTRA_CORE_DIR, `mihomo-${downloadedCore}`)
+  const p = path.join(NOCTUR_CORE_DIR, `mihomo-${downloadedCore}`)
   return existsSync(p) ? p : null
 }
 

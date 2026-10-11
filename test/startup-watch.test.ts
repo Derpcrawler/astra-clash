@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 import { watchStartup } from '../src/main/core/startup-watch'
 import { ProviderTracker, ProviderWaitCancelled } from '../src/main/core/provider-tracker'
 
-const LISTEN = 'time="x" level=info msg="RESTful API unix listening at: /tmp/astra.sock"\n'
+const LISTEN = 'time="x" level=info msg="RESTful API unix listening at: /tmp/noctur.sock"\n'
 const DEFAULT = 'time="x" level=info msg="Start initial compatible provider default"\n'
 const provider = (n: string): string => `time="x" level=info msg="Start initial provider ${n}"\n`
 

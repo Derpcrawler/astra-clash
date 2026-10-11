@@ -185,7 +185,7 @@ async function spawned(): Promise<FakeCore> {
 
 beforeEach(async () => {
   await manager.stopCore(true)
-  s.dir = mkdtempSync(join(tmpdir(), 'astra-core-'))
+  s.dir = mkdtempSync(join(tmpdir(), 'noctur-core-'))
   s.sent = []
   s.puts = []
   s.putFails = false

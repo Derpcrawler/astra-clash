@@ -72,7 +72,7 @@ const ProcessItemComponent: React.FC<Props> = ({ process, displayIcon, displayAp
                 <img src={iconUrl} className="size-12 shrink-0" />
               ) : (
                 <div className="size-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <span className="text-xs font-semibold text-muted-foreground">
+                  <span className="text-xs font-semibold text-(--noctur-fg2)">
                     {name.slice(0, 2).toUpperCase()}
                   </span>
                 </div>
@@ -83,7 +83,7 @@ const ProcessItemComponent: React.FC<Props> = ({ process, displayIcon, displayAp
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">{name}</span>
               <div className="flex items-center gap-1 shrink-0">
-                {/* Astra Clash: the palette accent, same as the Processes count (upstream used the
+                {/* Noctur: the palette accent, same as the Processes count (upstream used the
                     power-on gradient end, the palette's second accent here). */}
                 {hasActive && (
                   <Badge className="min-w-5 h-5 justify-center px-1.5 leading-none text-[11px] bg-primary text-primary-foreground border-0">
@@ -93,7 +93,7 @@ const ProcessItemComponent: React.FC<Props> = ({ process, displayIcon, displayAp
                 {process.closedCount > 0 && (
                   <Badge
                     variant="outline"
-                    className="min-w-5 h-5 justify-center px-1.5 leading-none text-[11px] text-muted-foreground"
+                    className="min-w-5 h-5 justify-center px-1.5 leading-none text-[11px] text-(--noctur-fg2)"
                   >
                     {process.closedCount}
                   </Badge>
@@ -101,14 +101,14 @@ const ProcessItemComponent: React.FC<Props> = ({ process, displayIcon, displayAp
               </div>
             </div>
             <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-(--noctur-fg2)">
                 {'\u2191'} {uploadTraffic} {'\u2193'} {downloadTraffic}
               </span>
               {hasSpeed && (
                 <>
                   <span className="text-xs text-muted-foreground/40">|</span>
                   <span
-                    className={`text-xs ${hasActive ? 'text-primary' : 'text-muted-foreground'}`}
+                    className={`text-xs ${hasActive ? 'text-primary' : 'text-(--noctur-fg2)'}`}
                   >
                     {'\u2191'} {uploadSpeed || '0 B'}/s {'\u2193'} {downloadSpeed || '0 B'}/s
                   </span>

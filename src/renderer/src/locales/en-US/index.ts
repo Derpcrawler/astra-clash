@@ -1,9 +1,16 @@
 export default {
-  astra: {
-    about: { credits: 'Astra Clash is a modified version of Koala Clash by coolcoala, which builds on Sparkle by xishang0128 and Mihomo Party by pompurin404. Licensed under GPL-3.0.' },
+  noctur: {
+    about: {
+      credits:
+        'Noctur is a modified version of Koala Clash by coolcoala, which builds on Sparkle by xishang0128 and Mihomo Party by pompurin404. Licensed under GPL-3.0.'
+    },
     palettes: { more: 'More', less: 'Show less' },
     profile: { every: 'every {{interval}}' },
-    picker: { test: 'Test delays', auto: 'This group picks its node automatically.', all: 'All proxy groups' },
+    picker: {
+      test: 'Test delays',
+      auto: 'This group picks its node automatically.',
+      all: 'All proxy groups'
+    },
     core: {
       upToDate: '{{version}}, same as built-in',
       title: 'Core',
@@ -18,9 +25,67 @@ export default {
       remove: 'Remove',
       note: 'Downloads come from MetaCubeX on GitHub and are checked against the SHA-256 GitHub publishes. Your password is asked once per core, to let it run TUN.'
     },
+    look: {
+      title: 'Look',
+      noctur: 'Noctur',
+      calm: 'Calm',
+      nocturDesc:
+        'The moon lights up with a sunrise when you connect, under drifting glows and stars.',
+      calmDesc: 'A simple power switch on a still sky. Nothing moves unless you do.',
+      welcome: 'Welcome to Noctur',
+      pick: 'Pick a look to start with. You can switch any time in Settings.',
+      continue: 'Continue'
+    },
+    update: {
+      available: 'A new version of Noctur is available:',
+      whatsNew: "What's new",
+      update: 'Update Noctur',
+      download: 'Download',
+      downloading: 'Downloading Noctur {{version}}',
+      cancel: 'Cancel',
+      installing: 'Installing Noctur {{version}}…',
+      restarting: 'Installed. Restarting Noctur…',
+      confirmMac: 'Confirm in the system window to install Noctur {{version}}',
+      closingWin: 'Noctur will close and reopen after installing {{version}}',
+      failedDownload: "Couldn't download Noctur {{version}}.",
+      failedInstall: "Couldn't install Noctur {{version}}.",
+      tryAgain: 'Try again',
+      fromGitHub: 'Download from GitHub',
+      notesTitle: "What's new in Noctur {{version}}",
+      onGitHub: 'Open on GitHub',
+      upToDate: 'Noctur is up to date ({{version}})',
+      availableToast: 'Noctur {{version}} is available. You can update it from Home.',
+      settingCheck: 'Check for new versions',
+      checkFailed: "Couldn't check for updates. Try again later."
+    },
     appearance: { starField: 'Star field', connectJump: 'Connect animation' },
-    settings: { connection: 'Connection', general: 'General', appearance: 'Appearance', advanced: 'Advanced', shortcuts: 'Shortcuts', about: 'About' },
-    nav: { home: 'Home', proxies: 'Proxy Groups', profiles: 'Profiles', connections: 'Connections', rules: 'Rules', logs: 'Logs', settings: 'Settings' },
+    settings: {
+      connection: 'Connection',
+      general: 'General',
+      appearance: 'Appearance',
+      advanced: 'Advanced',
+      shortcuts: 'Shortcuts',
+      about: 'About'
+    },
+    nav: {
+      home: 'Home',
+      proxies: 'Proxy Groups',
+      profiles: 'Profiles',
+      connections: 'Connections',
+      rules: 'Rules',
+      logs: 'Logs',
+      settings: 'Settings'
+    },
+    home: {
+      through: 'Through {{node}} for',
+      ready: 'Ready to connect with {{profile}}',
+      connect: 'Connect',
+      disconnect: 'Disconnect',
+      used: '{{used}} of {{total}} used',
+      method: 'Connection method',
+      tunHint: 'all apps',
+      proxyHint: 'proxy-aware apps'
+    },
     rule: 'Rule',
     global: 'Global',
     connected: 'Connected',
@@ -451,7 +516,7 @@ export default {
     pleaseConfirm: 'Please Confirm',
     confirmDelete: 'Confirm Delete',
     confirmImportProfile: 'Confirm import subscription config?',
-    confirmQuit: 'Are you sure you want to quit Astra Clash?',
+    confirmQuit: 'Are you sure you want to quit Noctur?',
     quitWarning: 'Proxy functionality will stop working after quitting',
     quickQuitHint: 'Double press or long press',
     canQuitDirectly: 'to quit directly',
@@ -691,7 +756,7 @@ export default {
       registerTaskSchedule: 'Register Task Schedule'
     },
     serviceModal: {
-      title: 'Astra Clash Service Management',
+      title: 'Noctur Service Management',
       serviceStatus: 'Service Status',
       connectionStatus: 'Connection Status',
       checking: 'Checking',
@@ -1004,7 +1069,7 @@ export default {
     sidebarHomeDesc: 'Click the Home icon in the sidebar to return and finish the tutorial.',
     supportTitle: 'Support',
     supportDesc: 'Click here to contact your provider support.',
-    welcome: 'Welcome to Astra Clash',
+    welcome: 'Welcome to Noctur',
     welcomeDesc:
       'This is an interactive tutorial to help you quickly get familiar with this app. Click "Next" to continue.',
     navbar: 'Navigation Bar',

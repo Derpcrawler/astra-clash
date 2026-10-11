@@ -1,3 +1,5 @@
+// Noctur: first, so Astra Clash's data folder moves before anything reads the data folder.
+import './noctur/migrate-early'
 import { createQuitFlow } from './sys/quit-flow'
 import { FORK } from './fork'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
@@ -28,9 +30,10 @@ import { createElevateTaskSync, ELEVATE_TASK } from './sys/misc'
 import { initProfileUpdater } from './core/profileUpdater'
 import { appendFileSync, existsSync, writeFileSync } from 'fs'
 import { exePath, logPath, taskDir } from './utils/dirs'
-import { afterPidFromArgv, waitForPidExit } from './astra/admin-relaunch'
-import { hasTrayHost } from './astra/tray-host'
-import { shutdownAndExit } from './astra/shutdown-sequence'
+import { afterPidFromArgv, waitForPidExit } from './noctur/admin-relaunch'
+import { hasTrayHost } from './noctur/tray-host'
+import { shutdownAndExit } from './noctur/shutdown-sequence'
+import { carryAstraAutostart, reportAstraMove } from './noctur/astra-carry'
 import { writeFile } from 'fs/promises'
 import { showFloatingWindow } from './resolve/floatingWindow'
 import { getAppConfigSync } from './config/app'
@@ -133,8 +136,8 @@ if (process.platform === 'win32' && is.dev) {
   patchControledMihomoConfig({ tun: { enable: false } })
 }
 
-// Astra Clash: a copy started by "Restart as administrator" waits for the copy that started it to
-// exit, so it gets the single-instance lock (astra/admin-relaunch.ts).
+// Noctur: a copy started by "Restart as administrator" waits for the copy that started it to
+// exit, so it gets the single-instance lock (noctur/admin-relaunch.ts).
 const afterPid = afterPidFromArgv(process.argv)
 if (afterPid !== null && !waitForPidExit(afterPid, 15000)) {
   try {
@@ -185,7 +188,7 @@ if (syncConfig.disableGPU) {
 function getDeepLinkFromArgs(argv: string[]): string | undefined {
   return argv.find(
     (arg) =>
-      arg.startsWith('clash://') || arg.startsWith('mihomo://') || arg.startsWith('astra-clash://')
+      arg.startsWith('clash://') || arg.startsWith('mihomo://') || arg.startsWith('noctur://')
   )
 }
 
@@ -210,7 +213,7 @@ app.on('open-url', async (_event, url) => {
   }
 })
 
-// Astra Clash: the before-quit decision lives in sys/quit-flow.ts; an accepted quit sets the shared
+// Noctur: the before-quit decision lives in sys/quit-flow.ts; an accepted quit sets the shared
 // shutdown state (sys/shutdown.ts) that wake recovery checks.
 const shutdownSteps = {
   disableSystemProxy: () => triggerSysProxy(false, false),
@@ -233,8 +236,8 @@ const quitFlow = createQuitFlow({
       clearTimeout(quitTimeout)
       quitTimeout = null
     }
-    // Astra Clash: wait for the system proxy to be off and the core stopped, then exit, also when
-    // either fails or hangs (astra/shutdown-sequence.ts).
+    // Noctur: wait for the system proxy to be off and the core stopped, then exit, also when
+    // either fails or hangs (noctur/shutdown-sequence.ts).
     await shutdownAndExit(shutdownSteps)
   }
 })
@@ -290,7 +293,7 @@ app.on('before-quit', (e) => {
 })
 
 powerMonitor.on('shutdown', async () => {
-  // Astra Clash: the same single shutdown as Quit (sys/quit-flow.ts), so a quit already under way
+  // Noctur: the same single shutdown as Quit (sys/quit-flow.ts), so a quit already under way
   // is joined rather than run twice.
   await quitFlow.shutdownNow()
 })
@@ -300,7 +303,7 @@ powerMonitor.on('shutdown', async () => {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('app.astraclash')
+  electronApp.setAppUserModelId('app.noctur.desktop')
   try {
     await initPromise
   } catch (e) {
@@ -320,6 +323,8 @@ app.whenReady().then(async () => {
   }
   const { showFloatingWindow: showFloating = false, disableTray = false } = appConfig
   registerIpcMainHandlers()
+  void carryAstraAutostart()
+  reportAstraMove()
 
   // Check process.argv for deep link URL (cold start on Windows/Linux)
   if (!pendingDeepLink) {
@@ -344,7 +349,7 @@ app.whenReady().then(async () => {
   const coreStartPromise = (async (): Promise<void> => {
     try {
       const [startPromise] = await startCore()
-      // Astra Clash: startup can end without the providers (core exit, TUN permission error, a
+      // Noctur: startup can end without the providers (core exit, TUN permission error, a
       // stop); that is logged instead of left as an unhandled rejection.
       startPromise.then(
         async () => {
@@ -394,7 +399,7 @@ async function handleDeepLink(url: string): Promise<void> {
   if (
     !url.startsWith('clash://') &&
     !url.startsWith('mihomo://') &&
-    !url.startsWith('astra-clash://')
+    !url.startsWith('noctur://')
   )
     return
 
@@ -487,7 +492,7 @@ function parseFilename(str: string): string {
   }
 }
 
-// Astra Clash: Windows caption buttons over a background color: light symbols on dark palettes,
+// Noctur: Windows caption buttons over a background color: light symbols on dark palettes,
 // dark symbols on light ones.
 function winCaptionColors(bg: string): { color: string; symbolColor: string; height: number } {
   const n = parseInt(bg.slice(1), 16)
@@ -534,16 +539,16 @@ export async function createWindow(appConfig?: AppConfig): Promise<void> {
       fullscreenable: false,
       titleBarStyle: useWindowFrame ? 'default' : 'hidden',
       titleBarOverlay: false,
-      // Astra Clash: the color macOS shows in newly exposed areas during a resize, before the page
-      // repaints. The page then sends the exact palette background (astraWindowBackground below).
+      // Noctur: the color macOS shows in newly exposed areas during a resize, before the page
+      // repaints. The page then sends the exact palette background (nocturWindowBackground below).
       backgroundColor: nativeTheme.shouldUseDarkColors ? '#050812' : '#f5f7fb',
-      // Astra Clash: same inset as Finder (16.5 pt from the top and left edges).
+      // Noctur: same inset as Finder (16.5 pt from the top and left edges).
       ...(process.platform === 'darwin' && !useWindowFrame && FORK.nativeWindowButtons
         ? { trafficLightPosition: { x: 17, y: 17 } }
         : {}),
-      // Astra Clash: native Windows caption buttons (with Snap Layouts) drawn over the page instead of
+      // Noctur: native Windows caption buttons (with Snap Layouts) drawn over the page instead of
       // the page's own buttons. Transparent so the page background shows behind them; the symbol
-      // color follows the palette (astraWindowBackground below). Page headers leave room for them
+      // color follows the palette (nocturWindowBackground below). Page headers leave room for them
       // through the titlebar-area CSS env() values (fork-theme.css).
       ...(process.platform === 'win32' && !useWindowFrame && FORK.nativeWindowButtons
         ? { titleBarOverlay: winCaptionColors(nativeTheme.shouldUseDarkColors ? '#050812' : '#f5f7fb') }
@@ -557,9 +562,9 @@ export async function createWindow(appConfig?: AppConfig): Promise<void> {
       }
     })
     mainWindowState.manage(mainWindow)
-    // Astra Clash: keep the window's base color equal to the palette background (see backgroundColor).
-    ipcMain.removeAllListeners('astraWindowBackground')
-    ipcMain.on('astraWindowBackground', (_e, color: unknown) => {
+    // Noctur: keep the window's base color equal to the palette background (see backgroundColor).
+    ipcMain.removeAllListeners('nocturWindowBackground')
+    ipcMain.on('nocturWindowBackground', (_e, color: unknown) => {
       if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return
       mainWindow?.setBackgroundColor(color)
       if (process.platform === 'win32' && !useWindowFrame && FORK.nativeWindowButtons) {
@@ -639,8 +644,8 @@ export async function createWindow(appConfig?: AppConfig): Promise<void> {
 
     mainWindow.on('close', async (event) => {
       event.preventDefault()
-      // Astra Clash: without a tray on Linux, closing the window quits (after the usual
-      // confirmation) instead of hiding the app with no way back to Quit (astra/tray-host.ts).
+      // Noctur: without a tray on Linux, closing the window quits (after the usual
+      // confirmation) instead of hiding the app with no way back to Quit (noctur/tray-host.ts).
       if (process.platform === 'linux' && !(await hasTrayHost())) {
         app.quit()
         return

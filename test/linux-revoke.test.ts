@@ -73,7 +73,7 @@ const realPlatform = process.platform
 beforeEach(() => {
   vi.resetModules()
   Object.defineProperty(process, 'platform', { value: 'linux' })
-  s.dir = mkdtempSync(join(tmpdir(), 'astra-revoke-'))
+  s.dir = mkdtempSync(join(tmpdir(), 'noctur-revoke-'))
   for (const core of ['mihomo', 'mihomo-alpha']) writeFileSync(join(s.dir, core), '')
   s.caps = {}
   s.calls = []

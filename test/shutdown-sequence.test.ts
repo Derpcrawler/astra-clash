@@ -23,7 +23,7 @@ vi.mock('../src/main/config', () => ({
   getControledMihomoConfig: async () => ({ 'mixed-port': 7897 })
 }))
 vi.mock('../src/main/utils/dirs', () => ({
-  logPath: () => join(tmpdir(), 'astra-shutdown-test.log'),
+  logPath: () => join(tmpdir(), 'noctur-shutdown-test.log'),
   servicePath: () => '/nonexistent'
 }))
 vi.mock('../src/main/service/api', () => ({
@@ -43,7 +43,7 @@ vi.mock('../src/main/resolve/server', () => ({ pacPort: 0, startPacServer: async
 vi.mock('../src/main/utils/i18n', () => ({ t: (k: string) => k }))
 
 const { triggerSysProxy } = await import('../src/main/sys/sysproxy')
-const { shutdownAndExit } = await import('../src/main/astra/shutdown-sequence')
+const { shutdownAndExit } = await import('../src/main/noctur/shutdown-sequence')
 
 function hold(name: string): () => void {
   let release!: () => void

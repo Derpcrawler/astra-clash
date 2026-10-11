@@ -26,7 +26,7 @@ const state = vi.hoisted(() => ({
 }))
 
 vi.mock('../src/main/utils/dirs', () => ({
-  ASTRA_CORE_DIR: '/nonexistent/Astra Clash/cores',
+  NOCTUR_CORE_DIR: '/nonexistent/Noctur/cores',
   dataDir: () => state.dataDir,
   mihomoCoreDir: () => '/nonexistent'
 }))
@@ -86,10 +86,10 @@ vi.mock('child_process', async (orig) => {
   return { ...real, execFile }
 })
 
-const { downloadCore, latestCore } = await import('../src/main/astra/core-download')
+const { downloadCore, latestCore } = await import('../src/main/noctur/core-download')
 
 beforeEach(() => {
-  state.dataDir = mkdtempSync(join(tmpdir(), 'astra-data-'))
+  state.dataDir = mkdtempSync(join(tmpdir(), 'noctur-data-'))
   state.admin = []
   state.patches = []
   state.releaseGate = null
