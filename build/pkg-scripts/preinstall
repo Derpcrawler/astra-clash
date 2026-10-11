@@ -1,17 +1,186 @@
 #!/bin/sh
+# Noctur: runs as root before the package's files are installed.
+#
+# The app was called Astra Clash before (bundle id app.astraclash). Its copy in /Applications is
+# quit and removed, so the Mac does not keep two copies of the app. The quit goes through the app's
+# own shutdown (core stopped, system proxy off): two quit requests in a row skip its confirmation
+# dialog. If it or one of its cores is still running after the wait (a core downloaded in its
+# Settings, or one that outlived the app), they are stopped, and the system proxy it set (manual or
+# automatic, pointing at 127.0.0.1) is turned off, as its shutdown would have done. If any are still
+# running after that, the installation stops with an error and Astra Clash is left as it was.
+#
+# A running Noctur is quit too, and opened again by postinstall, unless a self-update is installing.
+#
+# NOCTUR_PKG_ROOT, NOCTUR_PKG_QUIT_WAIT, NOCTUR_PKG_QUIT_REQUEST, NOCTUR_PKG_SELF_UPDATE_FLAG, NOCTUR_PKG_REOPEN_NOTE and NOCTUR_PKG_NETWORKSETUP exist
+# for the tests, which run this script against throwaway folders and fake commands; the installer
+# sets none of them.
 
-APP_NAME="Astra Clash"
+ROOT="${NOCTUR_PKG_ROOT:-}"
+QUIT_WAIT="${NOCTUR_PKG_QUIT_WAIT:-20}"
+NETWORKSETUP="${NOCTUR_PKG_NETWORKSETUP:-/usr/sbin/networksetup}"
 
-# --- Remove old app only if it is the old fork (contains koala-mihomo) ---
-OLD_APP="/Applications/${APP_NAME}.app"
-if [ -f "$OLD_APP/Contents/MacOS/koala-mihomo" ]; then
-    pkill -f "$OLD_APP" 2>/dev/null || true
-    sleep 2
-    pkill -9 -f "$OLD_APP" 2>/dev/null || true
-    rm -rf "$OLD_APP"
+OLD_APP="$ROOT/Applications/Astra Clash.app"
+OLD_ID="app.astraclash"
+# Cores downloaded in Astra Clash's Settings run from here (root-owned, see postinstall).
+OLD_CORES="$ROOT/Library/Application Support/Astra Clash/cores"
+
+# A path as an extended regular expression, for pgrep and pkill.
+ere() {
+    printf '%s' "$1" | sed 's/[][\.*^$+?(){}|]/\\&/g'
+}
+
+# Astra Clash's own processes are those whose program lies inside its app (the app, its helpers,
+# the bundled core) or in its downloaded cores folder. Matched at the start of the command line,
+# where the program's path is, so a process that only mentions such a path in its arguments is
+# never signalled.
+APP_PATTERN="^$(ere "$OLD_APP")/"
+CORES_PATTERN="^$(ere "$OLD_CORES")/"
+
+# The cores folder counts only as a real folder owned by the user running this script (root when
+# installing), so a folder someone else made cannot steer the signals.
+cores_trusted() {
+    [ -d "$OLD_CORES" ] && [ ! -L "$OLD_CORES" ] && [ ! -L "$(dirname "$OLD_CORES")" ] && \
+        [ "$(stat -f%u "$OLD_CORES")" = "$(id -u)" ]
+}
+
+app_valid=0
+if [ -d "$OLD_APP" ] && [ ! -L "$OLD_APP" ] && \
+   [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$OLD_APP/Contents/Info.plist" 2>/dev/null)" = "$OLD_ID" ]; then
+    app_valid=1
+fi
+cores_valid=0
+cores_trusted && cores_valid=1
+
+app_running() {
+    [ "$app_valid" = 1 ] && pgrep -f "${APP_PATTERN}Contents/MacOS/" >/dev/null 2>&1
+}
+
+old_running() {
+    { [ "$app_valid" = 1 ] && pgrep -f "$APP_PATTERN" >/dev/null 2>&1; } || \
+        { [ "$cores_valid" = 1 ] && pgrep -f "$CORES_PATTERN" >/dev/null 2>&1; }
+}
+
+signal_old() {
+    [ "$app_valid" = 1 ] && pkill "-$1" -f "$APP_PATTERN" 2>/dev/null
+    [ "$cores_valid" = 1 ] && pkill "-$1" -f "$CORES_PATTERN" 2>/dev/null
+    return 0
+}
+
+# Waits up to $1 half-seconds for the old processes to end.
+wait_old_gone() {
+    n=0
+    while old_running && [ "$n" -lt "$1" ]; do
+        sleep 0.5
+        n=$((n + 1))
+    done
+}
+
+# Two quit requests in the logged-in user's session, sent without waiting for the reply.
+request_quit() {
+    if [ -n "$NOCTUR_PKG_QUIT_REQUEST" ]; then
+        "$NOCTUR_PKG_QUIT_REQUEST" "$OLD_ID" &
+        return
+    fi
+    [ -n "$home" ] || return
+    launchctl asuser "$(id -u "$user")" sudo -u "$user" /usr/bin/osascript \
+        -e "tell application id \"$OLD_ID\" to quit" -e 'delay 0.2' \
+        -e "tell application id \"$OLD_ID\" to quit" >/dev/null 2>&1 &
+}
+
+if [ "$app_valid" = 1 ] || [ "$cores_valid" = 1 ]; then
+    user="$(stat -f%Su /dev/console 2>/dev/null)"
+    home=""
+    [ -n "$user" ] && [ "$user" != "root" ] && home="$(dscl . -read "/Users/$user" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+
+    if app_running; then
+        request_quit
+        waited=0
+        while app_running && [ "$waited" -lt "$((QUIT_WAIT * 2))" ]; do
+            sleep 0.5
+            waited=$((waited + 1))
+        done
+        # The app's shutdown stops its core; give it a moment after the app is gone.
+        wait_old_gone 6
+    fi
+
+    # Still running: the app did not quit, or a core outlived it (also one started from the
+    # downloaded cores folder). Stop them, then make sure they are gone.
+    if old_running; then
+        signal_old TERM
+        wait_old_gone 6
+        signal_old KILL
+        wait_old_gone 6
+        # Still there (restarted by something, or not ending): stop the installation before the
+        # proxy, the app or its cores are touched, so Astra Clash stays whole and usable.
+        if old_running; then
+            echo "Noctur preinstall: Astra Clash is still running; quit it and run the installer again" >&2
+            exit 1
+        fi
+        # The app's shutdown did not run. In System Proxy mode the proxy still points at its port.
+        config="$ROOT$home/Library/Application Support/astra-clash/config.yaml"
+        if [ -n "$home" ] && grep -q '^proxyMode: true' "$config" 2>/dev/null; then
+            "$NETWORKSETUP" -listallnetworkservices 2>/dev/null | tail -n +2 | sed 's/^\*//' | while IFS= read -r svc; do
+                if "$NETWORKSETUP" -getwebproxy "$svc" 2>/dev/null | grep -q '^Server: 127\.0\.0\.1$'; then
+                    "$NETWORKSETUP" -setwebproxystate "$svc" off
+                    "$NETWORKSETUP" -setsecurewebproxystate "$svc" off
+                    "$NETWORKSETUP" -setsocksfirewallproxystate "$svc" off
+                fi
+                if "$NETWORKSETUP" -getautoproxyurl "$svc" 2>/dev/null | grep -q '^URL: http://127\.0\.0\.1[:/]'; then
+                    "$NETWORKSETUP" -setautoproxystate "$svc" off
+                fi
+            done
+        fi
+    fi
+
+    [ "$app_valid" = 1 ] && rm -rf "$OLD_APP"
 fi
 
-# Astra Clash: upstream also removes a system-wide sparkle.helper service here. That belongs to
-# other apps (Sparkle, older Mihomo Party), so the fork leaves it alone.
+# A manual install over a running Noctur: quit it the same way (its own shutdown, two requests to skip
+# the confirmation), and leave a note so postinstall opens it again; it otherwise kept running the
+# old version until restarted by hand (owner, 2026-10-11). Not during a self-update, which runs the
+# installer with a fresh flag only root can write and restarts the app itself. If Noctur does not quit
+# in time it is left running, as before.
+NEW_APP="$ROOT/Applications/Noctur.app"
+NEW_ID="app.noctur.desktop"
+SELF_UPDATE_FLAG="${NOCTUR_PKG_SELF_UPDATE_FLAG:-$ROOT/private/var/run/noctur-self-update}"
+# A fixed path only root can write: macOS can run this script twice in one installation (owner's
+# test, 2026-10-11: the second run found Noctur already gone and the note was lost), so the note is
+# never removed here, only by postinstall.
+REOPEN_NOTE="${NOCTUR_PKG_REOPEN_NOTE:-$ROOT/private/var/run/noctur-reopen}"
+NEW_PATTERN="^$(ere "$NEW_APP")/Contents/MacOS/Noctur( |$)"
+
+noctur_running() {
+    pgrep -f "$NEW_PATTERN" >/dev/null 2>&1
+}
+
+self_update() {
+    [ -f "$SELF_UPDATE_FLAG" ] && [ -n "$(find "$SELF_UPDATE_FLAG" -mmin -10 2>/dev/null)" ]
+}
+
+if noctur_running && ! self_update; then
+    echo "Noctur preinstall: quitting Noctur for the installation"
+    nuser="$(stat -f%Su /dev/console 2>/dev/null)"
+    if [ -n "$NOCTUR_PKG_QUIT_REQUEST" ]; then
+        "$NOCTUR_PKG_QUIT_REQUEST" "$NEW_ID" &
+    elif [ -n "$nuser" ] && [ "$nuser" != "root" ]; then
+        launchctl asuser "$(id -u "$nuser")" sudo -u "$nuser" /usr/bin/osascript \
+            -e "tell application id \"$NEW_ID\" to quit" -e 'delay 0.2' \
+            -e "tell application id \"$NEW_ID\" to quit" >/dev/null 2>&1 &
+    fi
+    n=0
+    while noctur_running && [ "$n" -lt "$((QUIT_WAIT * 2))" ]; do
+        sleep 0.5
+        n=$((n + 1))
+    done
+    if noctur_running; then
+        echo "Noctur preinstall: Noctur did not quit; restart it after the installation" >&2
+    else
+        mkdir -p "$(dirname "$REOPEN_NOTE")"
+        printf '%s\n' "$nuser" > "$REOPEN_NOTE"
+    fi
+fi
+
+# Upstream also removes a system-wide sparkle.helper service here. That belongs to other apps
+# (Sparkle, older Mihomo Party), so this package leaves it alone.
 
 exit 0

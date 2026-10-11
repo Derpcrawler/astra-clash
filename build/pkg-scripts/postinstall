@@ -1,13 +1,17 @@
 #!/bin/sh
+# Noctur: runs as root after the package's files are installed. NOCTUR_PKG_ROOT,
+# NOCTUR_PKG_REOPEN_NOTE and NOCTUR_PKG_REOPEN exist for the tests, which run this script against throwaway folders; the
+# installer does not set them.
 
-APP_NAME="Astra Clash"
-CORRECT_PATH="/Applications/${APP_NAME}.app"
-WRONG_PATH="/Applications/${APP_NAME}.localized/${APP_NAME}.app"
+ROOT="${NOCTUR_PKG_ROOT:-}"
+APP_NAME="Noctur"
+CORRECT_PATH="$ROOT/Applications/${APP_NAME}.app"
+WRONG_PATH="$ROOT/Applications/${APP_NAME}.localized/${APP_NAME}.app"
 
 # --- Fix install path if installer created .localized directory ---
 if [ -d "$WRONG_PATH" ] && [ ! -d "$CORRECT_PATH" ]; then
     mv "$WRONG_PATH" "$CORRECT_PATH"
-    rm -rf "/Applications/${APP_NAME}.localized"
+    rm -rf "$ROOT/Applications/${APP_NAME}.localized"
 fi
 
 # --- Set suid on mihomo binaries ---
@@ -16,4 +20,74 @@ chown root:admin "$CORRECT_PATH/Contents/Resources/sidecar/mihomo-alpha"
 chmod +s "$CORRECT_PATH/Contents/Resources/sidecar/mihomo"
 chmod +s "$CORRECT_PATH/Contents/Resources/sidecar/mihomo-alpha"
 
-exit 0
+# --- Cores downloaded in Settings under the previous name, Astra Clash ---
+# They move to Noctur's folder with their root ownership and setuid mode, so a downloaded core in
+# use stays in use. When Noctur already has its own cores folder, the old one is removed instead: a
+# setuid core must not stay behind in a folder no app uses. Every folder involved must be a real
+# folder (not a link) owned by the user running this script (root when installing), and Noctur's
+# not writable by others; otherwise nothing is moved or removed. If a step fails, the old cores stay
+# where they are and the script reports the failure.
+OLD_SUPPORT="$ROOT/Library/Application Support/Astra Clash"
+NEW_SUPPORT="$ROOT/Library/Application Support/Noctur"
+status=0
+uid="$(id -u)"
+
+fail() {
+    echo "Noctur postinstall: $*" >&2
+    status=1
+}
+
+owned_dir() {
+    [ -d "$1" ] && [ ! -L "$1" ] && [ "$(stat -f%u "$1")" = "$uid" ]
+}
+
+# Owned, and not writable by group or others.
+private_dir() {
+    owned_dir "$1" && [ $(( 0$(stat -f%Lp "$1") & 022 )) -eq 0 ]
+}
+
+# Not there at all (a broken link counts as there).
+absent() {
+    [ ! -e "$1" ] && [ ! -L "$1" ]
+}
+
+if owned_dir "$OLD_SUPPORT"; then
+    if ! absent "$NEW_SUPPORT" && ! private_dir "$NEW_SUPPORT"; then
+        fail "$NEW_SUPPORT is not a folder only root can write to; Astra Clash's cores stay in $OLD_SUPPORT"
+    elif ! absent "$NEW_SUPPORT/cores"; then
+        if private_dir "$NEW_SUPPORT/cores"; then
+            rm -rf "$OLD_SUPPORT" || fail "could not remove $OLD_SUPPORT"
+        else
+            fail "$NEW_SUPPORT/cores is not a folder only root can write to; Astra Clash's cores stay in $OLD_SUPPORT"
+        fi
+    elif owned_dir "$OLD_SUPPORT/cores"; then
+        if { [ -d "$NEW_SUPPORT" ] || mkdir "$NEW_SUPPORT"; } && chmod 755 "$NEW_SUPPORT" && \
+           mv "$OLD_SUPPORT/cores" "$NEW_SUPPORT/cores"; then
+            rm -rf "$OLD_SUPPORT" || fail "could not remove $OLD_SUPPORT"
+        else
+            fail "could not move Astra Clash's cores to $NEW_SUPPORT; they stay in $OLD_SUPPORT"
+        fi
+    else
+        # No cores folder of Astra Clash's own (none, or a link): nothing in use to keep.
+        rm -rf "$OLD_SUPPORT" || fail "could not remove $OLD_SUPPORT"
+    fi
+fi
+
+# Open Noctur again if preinstall quit it for this installation, as the user who was running it.
+# The note is preinstall's (a fixed path only root can write); one older than 30 minutes is from an
+# installation that did not finish and is only removed.
+REOPEN_NOTE="${NOCTUR_PKG_REOPEN_NOTE:-$ROOT/private/var/run/noctur-reopen}"
+if [ -f "$REOPEN_NOTE" ] && [ -z "$(find "$REOPEN_NOTE" -mmin -30 2>/dev/null)" ]; then
+    rm -f "$REOPEN_NOTE"
+elif [ -f "$REOPEN_NOTE" ]; then
+    ruser="$(cat "$REOPEN_NOTE")"
+    rm -f "$REOPEN_NOTE"
+    echo "Noctur postinstall: opening Noctur again for $ruser"
+    if [ -n "$NOCTUR_PKG_REOPEN" ]; then
+        "$NOCTUR_PKG_REOPEN" "$ruser" "$CORRECT_PATH"
+    elif [ -n "$ruser" ] && [ "$ruser" != "root" ] && id -u "$ruser" >/dev/null 2>&1; then
+        launchctl asuser "$(id -u "$ruser")" sudo -u "$ruser" /usr/bin/open "$CORRECT_PATH" >/dev/null 2>&1 &
+    fi
+fi
+
+exit $status
