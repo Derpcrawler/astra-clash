@@ -1,3 +1,26 @@
+## 1.1.0
+
+### New
+
+- Astra Clash is now Noctur, with a new icon. Settings, profiles and autostart move over on first start.
+- New interface and design.
+- Calm look: a simple power switch on a still sky. Pick a look on first start or any time in Settings.
+- Choose TUN or System Proxy right from Home.
+- Usage bar for subscriptions with a traffic limit.
+- Two palettes: Noctur and Void.
+- Updates in one click: Noctur tells you on Home when a new version is out and installs it (macOS and Windows).
+- New menu bar icon on macOS.
+
+### Improved
+
+- Better compatibility with different subscription panels.
+- Easier-to-read secondary text on Profiles, Proxy Groups and Connections.
+- Small interface improvements and tweaks.
+
+### Fixed
+
+- Bug fixes.
+
 ## 1.0.6
 
 ### Improved
