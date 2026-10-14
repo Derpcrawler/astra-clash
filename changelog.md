@@ -1,3 +1,9 @@
+## 1.1.1
+
+### Fixed
+
+- macOS: in TUN mode, DNS lookups now go through Noctur instead of your network's DNS server. Sites that the network's DNS blocks or answers slowly load normally, which is most noticeable with a corporate VPN client such as Check Point running. Your DNS settings are restored when you disconnect or quit.
+
 ## 1.1.0
 
 ### New
