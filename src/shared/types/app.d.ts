@@ -68,7 +68,10 @@ interface AppConfig {
   mihomoCpuPriority?: Priority
   diffWorkDir?: boolean
   autoSetDNSMode?: 'none' | 'exec' | 'service'
+  /** Upstream's single saved DNS; dropped on the next set or restore (noctur/system-dns.ts). */
   originDNS?: string
+  /** Noctur: each network service's DNS before it was pointed into the tunnel ("Empty": DHCP). */
+  originDNSByService?: Record<string, string>
   useWindowFrame: boolean
   proxyInTray: boolean
   appTheme: AppTheme
